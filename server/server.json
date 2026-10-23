@@ -1,0 +1,11 @@
+{
+    "server_name": "Flash — мой сервер",
+    "description": "Опиши свой сервер тут",
+    "version": "1.0.0",
+    "port": 8080,
+    "password": "",
+    "registration_open": true,
+    "encryption_key": "сюда_впиши_32_символа_ключа_шифрования_!!!",
+    "jwt_secret": "сюда_впиши_свой_секрет_для_JWT_!!!",
+    "connect_secret": "сюда_впиши_секрет_для_подключения_к_серверу_!!!"
+}

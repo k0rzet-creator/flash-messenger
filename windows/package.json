@@ -1,0 +1,50 @@
+{
+    "name": "flash-messenger",
+    "version": "1.0.0",
+    "description": "Flash — мессенджер нового поколения",
+    "main": "main.js",
+    "author": "K0RZET",
+    "license": "MIT",
+    "scripts": {
+        "start": "electron .",
+        "build": "electron-builder --win --x64"
+    },
+    "devDependencies": {
+        "electron": "^32.0.0",
+        "electron-builder": "^25.0.0"
+    },
+    "build": {
+        "appId": "com.k0rzet.flash",
+        "productName": "Flash",
+        "directories": {
+            "output": "dist"
+        },
+        "files": [
+            "main.js",
+            "preload.js",
+            "titlebar.html",
+            "titlebar.css",
+            "titlebar.js",
+            "index.html",
+            "app.js",
+            "style.css",
+            "client.json",
+            "icon.ico"
+        ],
+        "win": {
+            "target": [
+                { "target": "nsis", "arch": ["x64"] },
+                { "target": "portable", "arch": ["x64"] }
+            ],
+            "icon": "icon.ico"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true,
+            "shortcutName": "Flash",
+            "license": "LICENSE.txt"
+        }
+    }
+}

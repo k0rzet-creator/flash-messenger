@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Flash</title>
+<link rel="stylesheet" href="titlebar.css">
+</head>
+<body>
+
+<div class="titlebar">
+    <div class="titlebar-left">
+        <button class="nav-btn" id="btn-back" title="Назад" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 12H5"/>
+                <path d="m12 19-7-7 7-7"/>
+            </svg>
+        </button>
+        <button class="nav-btn" id="btn-forward" title="Вперёд" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14"/>
+                <path d="m12 5 7 7-7 7"/>
+            </svg>
+        </button>
+        <button class="nav-btn" id="btn-reload" title="Обновить">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                <path d="M21 3v5h-5"/>
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                <path d="M8 16H3v5"/>
+            </svg>
+        </button>
+    </div>
+
+    <div class="titlebar-center">
+        <div class="logo-mark">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="white" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <span class="app-title">Flash</span>
+    </div>
+
+    <div class="titlebar-right">
+        <button class="win-btn" id="btn-minimize" title="Свернуть">
+            <svg width="10" height="10" viewBox="0 0 10 10">
+                <line x1="1" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1.2"/>
+            </svg>
+        </button>
+        <button class="win-btn" id="btn-maximize" title="Развернуть">
+            <svg width="10" height="10" viewBox="0 0 10 10" class="icon-max">
+                <rect x="1" y="1" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            </svg>
+            <svg width="10" height="10" viewBox="0 0 10 10" class="icon-restore" style="display:none;">
+                <rect x="1" y="3" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.2"/>
+                <path d="M3 3 V1 H9 V7 H7" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            </svg>
+        </button>
+        <button class="win-btn win-btn-close" id="btn-close" title="Закрыть">
+            <svg width="10" height="10" viewBox="0 0 10 10">
+                <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="1.2"/>
+                <line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="1.2"/>
+            </svg>
+        </button>
+    </div>
+</div>
+
+<div class="content"></div>
+
+<script src="titlebar.js"></script>
+</body>
+</html>
