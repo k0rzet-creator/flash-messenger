@@ -3,1486 +3,140 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Скачать Flash — мессенджер нового поколения</title>
-
-<meta name="description" content="Скачай Flash для Windows, Android, или открой веб-версию. Исходный код открыт.">
+<title>Скачать Flash</title>
 <meta name="theme-color" content="#ff2d6f">
-
-<link rel="manifest" href="/manifest.json">
-<link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png">
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-
 <style>
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  :root {
-    --bg: #08080a;
-    --bg-soft: #0f0f12;
-    --bg-elev: #131318;
-    --bg-card: #14141C;
-    --accent: #ff2d6f;
-    --accent-h: #ff4585;
-    --accent-soft: #ff2d6f33;
-    --white: #ffffff;
-    --gray: #8b8b96;
-    --gray-dim: #4a4a55;
-    --border: rgba(255, 255, 255, 0.06);
-    --border-strong: rgba(255, 255, 255, 0.14);
-    --green: #22c55e;
-    --blue: #2aabee;
-    --purple: #a78bfa;
-  }
-
-  html { scroll-behavior: smooth; }
-
-  body {
-    background: var(--bg);
-    color: var(--white);
-    overflow-x: hidden;
-    line-height: 1.5;
-    position: relative;
-    min-height: 100vh;
-  }
-
-  .bg-layer {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    overflow: hidden;
-  }
-
-  .bg-layer::before {
-    content: '';
-    position: absolute;
-    top: -40%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 120vw;
-    height: 120vw;
-    max-width: 1600px;
-    max-height: 1600px;
-    background: radial-gradient(circle, var(--accent-soft) 0%, transparent 55%);
-    filter: blur(60px);
-    opacity: 0.5;
-  }
-
-  .bg-layer::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
-    background-size: 80px 80px;
-    mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%);
-    -webkit-mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%);
-  }
-
-  /* ============ NAV ============ */
-  nav {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    z-index: 100;
-    padding: 20px 40px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    background: rgba(8, 8, 10, 0.6);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .nav-logo {
-    font-size: 20px;
-    font-weight: 900;
-    letter-spacing: -0.5px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    text-decoration: none;
-    color: var(--white);
-  }
-
-  .nav-logo-mark {
-    width: 32px;
-    height: 32px;
-    background: var(--accent);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 0 24px var(--accent-soft);
-  }
-
-  .nav-links {
-    display: flex;
-    gap: 36px;
-    list-style: none;
-  }
-
-  .nav-links a {
-    color: var(--gray);
-    text-decoration: none;
-    font-size: 14px;
-    font-weight: 500;
-    transition: color 0.2s;
-  }
-
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', -apple-system, sans-serif; }
+  :root { --bg: #08080a; --bg-soft: #0f0f12; --accent: #ff2d6f; --white: #fff; --gray: #8b8b96; --gray-dim: #4a4a55; --border: rgba(255,255,255,0.06); }
+  body { background: var(--bg); color: var(--white); line-height: 1.5; }
+  
+  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(20px); background: rgba(8,8,10,0.6); border-bottom: 1px solid var(--border); }
+  .nav-logo { font-size: 20px; font-weight: 900; display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--white); }
+  .nav-logo-mark { width: 32px; height: 32px; background: var(--accent); border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+  .nav-links { display: flex; gap: 36px; list-style: none; }
+  .nav-links a { color: var(--gray); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
   .nav-links a:hover { color: var(--white); }
+  .nav-cta { background: var(--white); color: var(--bg); padding: 10px 22px; border-radius: 100px; text-decoration: none; font-size: 14px; font-weight: 700; transition: all 0.25s; }
+  .nav-cta:hover { background: var(--accent); color: var(--white); }
 
-  .nav-cta {
-    background: var(--white);
-    color: var(--bg);
-    padding: 10px 22px;
-    border-radius: 100px;
-    text-decoration: none;
-    font-size: 14px;
-    font-weight: 700;
-    transition: all 0.25s;
-  }
+  .dl-hero { padding: 140px 40px 40px; max-width: 1240px; margin: 0 auto; text-align: center; }
+  .section-tag { display: inline-block; font-size: 12px; color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 20px; }
+  .dl-hero h1 { font-size: clamp(42px, 7vw, 96px); font-weight: 900; line-height: 0.95; margin-bottom: 20px; }
+  .dl-hero h1 .accent { color: var(--accent); font-style: italic; }
+  .dl-hero p { color: var(--gray); font-size: 17px; max-width: 560px; margin: 0 auto; }
+  .dl-hero p strong { color: var(--white); }
 
-  .nav-cta:hover {
-    background: var(--accent);
-    color: var(--white);
-    box-shadow: 0 0 30px var(--accent-soft);
-  }
-
-  /* ============ HERO ============ */
-  .dl-hero {
-    position: relative;
-    z-index: 1;
-    padding: 140px 40px 40px;
-    max-width: 1240px;
-    margin: 0 auto;
-    text-align: center;
-  }
-
-  .dl-hero .section-tag {
-    display: inline-block;
-    font-size: 12px;
-    color: var(--accent);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 3px;
-    margin-bottom: 20px;
-  }
-
-  .dl-hero h1 {
-    font-size: clamp(42px, 7vw, 96px);
-    font-weight: 900;
-    line-height: 0.95;
-    letter-spacing: -0.05em;
-    margin-bottom: 20px;
-  }
-
-  .dl-hero h1 .accent {
-    color: var(--accent);
-    font-style: italic;
-  }
-
-  .dl-hero p {
-    color: var(--gray);
-    font-size: 17px;
-    max-width: 560px;
-    margin: 0 auto;
-    line-height: 1.65;
-  }
-
-  .dl-hero p strong { color: var(--white); font-weight: 600; }
-
-  /* ============ TABS ============ */
-  .dl-tabs-wrap {
-    position: relative;
-    z-index: 1;
-    max-width: 1240px;
-    margin: 0 auto;
-    padding: 0 40px 80px;
-  }
-
-  .dl-tabs {
-    display: flex;
-    gap: 6px;
-    background: var(--bg-soft);
-    border: 1px solid var(--border);
-    border-radius: 100px;
-    padding: 6px;
-    margin-bottom: 40px;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .dl-tabs::-webkit-scrollbar { display: none; }
-
-  .dl-tab {
-    flex: 1;
-    min-width: 120px;
-    padding: 14px 24px;
-    background: transparent;
-    border: none;
-    border-radius: 100px;
-    color: var(--gray);
-    font-size: 14px;
-    font-weight: 700;
-    font-family: inherit;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    white-space: nowrap;
-  }
-
+  .dl-tabs-wrap { max-width: 1240px; margin: 0 auto; padding: 0 40px 80px; }
+  .dl-tabs { display: flex; gap: 6px; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 100px; padding: 6px; margin-bottom: 40px; overflow-x: auto; }
+  .dl-tab { flex: 1; padding: 14px 24px; background: transparent; border: none; border-radius: 100px; color: var(--gray); font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.3s; white-space: nowrap; }
   .dl-tab:hover { color: var(--white); }
+  .dl-tab.active { background: var(--accent); color: var(--white); box-shadow: 0 8px 30px -8px rgba(255,45,111,0.6); }
 
-  .dl-tab.active {
-    background: var(--accent);
-    color: var(--white);
-    box-shadow: 0 8px 30px -8px rgba(255, 45, 111, 0.6);
-  }
-
-  .dl-tab svg { flex-shrink: 0; }
-
-  /* ============ CONTENT ============ */
-  .dl-content-wrap {
-    display: none;
-    animation: fadeIn 0.4s cubic-bezier(0.2, 0.9, 0.3, 1);
-  }
-
+  .dl-content-wrap { display: none; animation: fadeIn 0.4s; }
   .dl-content-wrap.active { display: block; }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(15px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .dl-content {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 60px;
-    align-items: center;
-  }
-
-  .dl-content-text h2 {
-    font-size: clamp(32px, 4.5vw, 56px);
-    font-weight: 900;
-    line-height: 1.02;
-    letter-spacing: -0.04em;
-    margin-bottom: 20px;
-  }
-
-  .dl-content-text h2 .accent {
-    color: var(--accent);
-    font-style: italic;
-  }
-
-  .dl-content-text p {
-    color: var(--gray);
-    font-size: 16px;
-    line-height: 1.7;
-    margin-bottom: 16px;
-  }
-
-  .dl-content-text p strong { color: var(--white); font-weight: 600; }
-
-  .dl-features {
-    list-style: none;
-    margin: 24px 0;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .dl-features li {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    font-size: 14.5px;
-    color: var(--white);
-    line-height: 1.5;
-  }
-
-  .dl-features .check {
-    width: 22px;
-    height: 22px;
-    min-width: 22px;
-    border-radius: 7px;
-    background: var(--accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--white);
-    margin-top: 1px;
-    flex-shrink: 0;
-  }
-
-  .dl-action {
-    display: inline-flex;
-    align-items: center;
-    gap: 12px;
-    background: var(--accent);
-    color: var(--white);
-    text-decoration: none;
-    padding: 18px 36px;
-    border-radius: 100px;
-    font-size: 16px;
-    font-weight: 700;
-    transition: all 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
-    box-shadow: 0 0 0 0 var(--accent-soft), 0 20px 40px -12px rgba(255, 45, 111, 0.4);
-    border: none;
-    cursor: pointer;
-    font-family: inherit;
-    margin-top: 8px;
-  }
-
-  .dl-action:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 0 0 8px var(--accent-soft), 0 24px 50px -12px rgba(255, 45, 111, 0.6);
-  }
-
-  .dl-action .arrow { transition: transform 0.3s; display: flex; }
-  .dl-action:hover .arrow { transform: translateX(4px); }
-
-  .dl-action-ghost {
-    background: transparent;
-    border: 1px solid var(--border-strong);
-    box-shadow: none;
-    margin-left: 10px;
-  }
-
-  .dl-action-ghost:hover {
-    background: var(--bg-elev);
-    transform: translateY(-3px);
-    box-shadow: none;
-  }
-
-  .dl-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 8px;
-  }
-
-  .dl-actions .dl-action { margin-top: 0; }
-
-  /* ============ VISUALS ============ */
-  .dl-visual {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    min-height: 500px;
-  }
-
-  /* --- Браузер + телефон --- */
-  .browser-mockup {
-    width: 100%;
-    max-width: 560px;
-    background: linear-gradient(145deg, #1c1c26, #0f0f16);
-    border-radius: 16px;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
-    position: relative;
-    z-index: 1;
-  }
-
-  .browser-top {
-    height: 44px;
-    background: #18181f;
-    display: flex;
-    align-items: center;
-    padding: 0 14px;
-    gap: 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  }
-
-  .browser-dots {
-    display: flex;
-    gap: 6px;
-    flex-shrink: 0;
-  }
-
-  .browser-dots span {
-    width: 11px;
-    height: 11px;
-    border-radius: 50%;
-    display: inline-block;
-  }
-
-  .browser-dots span:nth-child(1) { background: #ff5f57; }
-  .browser-dots span:nth-child(2) { background: #febc2e; }
-  .browser-dots span:nth-child(3) { background: #28c840; }
-
-  .browser-tab {
-    flex: 1;
-    max-width: 240px;
-    height: 30px;
-    background: #22222b;
-    border-radius: 8px 8px 0 0;
-    display: flex;
-    align-items: center;
-    padding: 0 12px;
-    gap: 8px;
-    font-size: 11px;
-    color: #8b8b96;
-    position: relative;
-    top: 6px;
-  }
-
-  .browser-tab .favicon {
-    width: 12px;
-    height: 12px;
-    background: var(--accent);
-    border-radius: 3px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .browser-tab .favicon svg { width: 8px; height: 8px; }
-
-  .browser-url-bar {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: #22222b;
-    height: 30px;
-    border-radius: 15px;
-    padding: 0 14px;
-    font-size: 11px;
-    color: #8b8b96;
-    font-family: 'Consolas', 'Monaco', monospace;
-    margin-left: 8px;
-  }
-
-  .browser-url-bar svg { opacity: 0.6; flex-shrink: 0; }
-
-  .browser-body {
-    height: 380px;
-    background: var(--bg);
-    display: flex;
-    overflow: hidden;
-    position: relative;
-  }
-
-  /* Мини-приложение внутри браузера */
-  .mini-app {
-    width: 100%;
-    height: 100%;
-    display: grid;
-    grid-template-columns: 100px 1fr;
-    background: var(--bg);
-  }
-
-  .mini-sidebar {
-    background: var(--bg-soft);
-    border-right: 1px solid var(--border);
-    padding: 12px 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .mini-sidebar-logo {
-    width: 28px;
-    height: 28px;
-    background: var(--accent);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 10px;
-  }
-
-  .mini-chat-item {
-    height: 32px;
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 8px;
-    padding: 6px 8px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .mini-chat-item.active {
-    background: rgba(255, 45, 111, 0.15);
-    border-left: 2px solid var(--accent);
-  }
-
-  .mini-avatar {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--accent);
-    flex-shrink: 0;
-  }
-
-  .mini-line {
-    height: 5px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 3px;
-    flex: 1;
-  }
-
-  .mini-line-short { max-width: 40px; }
-
-  .mini-chat {
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .mini-msg {
-    max-width: 70%;
-    padding: 7px 11px;
-    border-radius: 12px;
-    font-size: 10px;
-  }
-
-  .mini-msg-in {
-    background: #1a1a20;
-    align-self: flex-start;
-    border-bottom-left-radius: 3px;
-  }
-
-  .mini-msg-out {
-    background: var(--accent);
-    align-self: flex-end;
-    border-bottom-right-radius: 3px;
-  }
-
-  /* --- Телефон справа (iOS) --- */
-  .phone-ios {
-    position: absolute;
-    right: -20px;
-    bottom: -30px;
-    width: 180px;
-    height: 370px;
-    background: linear-gradient(145deg, #1c1c26, #0f0f16);
-    border-radius: 32px;
-    padding: 8px;
-    box-shadow:
-      0 0 0 2px rgba(255, 45, 111, 0.15),
-      0 30px 60px rgba(0, 0, 0, 0.8);
-    z-index: 3;
-    transform: rotate(3deg);
-    transition: transform 0.5s;
-  }
-
-  .phone-ios:hover { transform: rotate(0deg) scale(1.03); }
-
-  .phone-ios::before {
-    content: '';
-    position: absolute;
-    top: 8px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 60px;
-    height: 18px;
-    background: #000;
-    border-radius: 0 0 12px 12px;
-    z-index: 10;
-  }
-
-  .phone-ios-screen {
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(180deg, #0f0f16 0%, #15151f 100%);
-    border-radius: 26px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-  }
-
-  .ios-status {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 22px 14px 6px;
-    font-size: 9px;
-    color: var(--white);
-    font-weight: 600;
-  }
-
-  .ios-status-right {
-    display: flex;
-    gap: 3px;
-    align-items: center;
-  }
-
-  .ios-status-right svg { opacity: 0.9; }
-
-  /* --- Windows frame mockup --- */
-  .win-frame {
-    width: 100%;
-    max-width: 560px;
-    background: #0f0f12;
-    border-radius: 12px;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7);
-    position: relative;
-    z-index: 1;
-  }
-
-  .win-titlebar {
-    height: 32px;
-    background: #0f0f12;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 6px 0 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  }
-
-  .win-titlebar-left {
-    display: flex;
-    gap: 2px;
-    align-items: center;
-  }
-
-  .win-nav-icon {
-    width: 22px;
-    height: 22px;
-    border-radius: 5px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #8b8b96;
-  }
-
-  .win-titlebar-center {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-
-  .win-title-logo {
-    width: 16px;
-    height: 16px;
-    background: var(--accent);
-    border-radius: 5px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .win-title-text {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--white);
-  }
-
-  .win-titlebar-right {
-    display: flex;
-    gap: 2px;
-  }
-
-  .win-ctrl {
-    width: 32px;
-    height: 24px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #8b8b96;
-  }
-
-  .win-ctrl-close { color: #8b8b96; }
-
-  .win-body {
-    height: 380px;
-    background: var(--bg);
-    display: flex;
-    overflow: hidden;
-  }
-
-  /* --- Android phone (без браузера) --- */
-  .phone-android {
-    width: 240px;
-    height: 500px;
-    background: linear-gradient(145deg, #1c1c26, #0f0f16);
-    border-radius: 34px;
-    padding: 10px;
-    box-shadow:
-      0 0 0 2px rgba(255, 45, 111, 0.15),
-      0 30px 80px rgba(0, 0, 0, 0.7);
-    position: relative;
-    z-index: 1;
-  }
-
-  .phone-android::before {
-    content: '';
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 80px;
-    height: 20px;
-    background: #000;
-    border-radius: 0 0 14px 14px;
-    z-index: 10;
-  }
-
-  .phone-android-screen {
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(180deg, #0f0f16 0%, #15151f 100%);
-    border-radius: 26px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-  }
-
-  /* --- Код (для вкладки исходников) --- */
-  .code-block {
-    width: 100%;
-    max-width: 560px;
-    background: #0d0d12;
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    overflow: hidden;
-    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
-    font-family: 'Consolas', 'Monaco', monospace;
-    font-size: 12.5px;
-    line-height: 1.6;
-    position: relative;
-    z-index: 1;
-  }
-
-  .code-header {
-    background: #131318;
-    padding: 10px 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .code-header-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-  }
-
-  .code-header-file {
-    font-size: 11px;
-    color: var(--gray);
-    margin-left: 12px;
-    font-family: 'Consolas', 'Monaco', monospace;
-  }
-
-  .code-body {
-    padding: 16px 20px;
-    color: #e4e4e7;
-    overflow: hidden;
-  }
-
-  .code-line {
-    display: flex;
-    gap: 16px;
-    white-space: pre;
-  }
-
-  .code-line-num {
-    color: #3f3f46;
-    user-select: none;
-    min-width: 20px;
-    text-align: right;
-  }
-
-  .code-line-text {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .c-keyword { color: #c084fc; }
-  .c-string { color: #86efac; }
-  .c-func { color: #7dd3fc; }
-  .c-comment { color: #52525b; font-style: italic; }
-  .c-number { color: #fbbf24; }
-  .c-op { color: #f472b6; }
-  .c-prop { color: #fda4af; }
-  .c-bracket { color: #a1a1aa; }
-
-  /* ============ BACK TO SITE ============ */
-  .dl-back {
-    position: relative;
-    z-index: 1;
-    text-align: center;
-    padding: 40px 40px 100px;
-  }
-
-  .dl-back a {
-    color: var(--gray);
-    text-decoration: none;
-    font-size: 14px;
-    transition: color 0.2s;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-  }
-
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+  
+  .dl-content-text h2 { font-size: clamp(32px, 4.5vw, 56px); font-weight: 900; line-height: 1.02; margin-bottom: 20px; }
+  .dl-content-text h2 .accent { color: var(--accent); font-style: italic; }
+  .dl-content-text p { color: var(--gray); font-size: 16px; line-height: 1.7; margin-bottom: 16px; }
+  .dl-content-text p strong { color: var(--white); }
+  
+  .dl-action { display: inline-flex; align-items: center; gap: 12px; background: var(--accent); color: var(--white); text-decoration: none; padding: 18px 36px; border-radius: 100px; font-size: 16px; font-weight: 700; transition: all 0.3s; box-shadow: 0 20px 40px -12px rgba(255,45,111,0.4); margin-top: 8px; }
+  .dl-action:hover { transform: translateY(-3px); box-shadow: 0 0 0 8px rgba(255,45,111,0.2), 0 24px 50px -12px rgba(255,45,111,0.6); }
+  .dl-action-ghost { background: transparent; border: 1px solid var(--border); box-shadow: none; }
+  .dl-action-ghost:hover { background: var(--bg-soft); transform: translateY(-3px); box-shadow: none; }
+  
+  .dl-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+
+  .dl-back { text-align: center; padding: 40px 40px 100px; }
+  .dl-back a { color: var(--gray); text-decoration: none; font-size: 14px; transition: color 0.2s; }
   .dl-back a:hover { color: var(--accent); }
 
-  /* ============ FOOTER ============ */
-  footer {
-    position: relative;
-    z-index: 1;
-    border-top: 1px solid var(--border);
-    padding: 60px 40px 40px;
-    max-width: 1240px;
-    margin: 0 auto;
-  }
+  footer { border-top: 1px solid var(--border); padding: 60px 40px 40px; max-width: 1240px; margin: 0 auto; }
+  .footer-bottom { display: flex; justify-content: space-between; align-items: center; padding-top: 20px; color: var(--gray-dim); font-size: 13px; }
+  .footer-bottom .by { color: var(--accent); font-weight: 700; letter-spacing: 1px; }
 
-  .footer-bottom {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-top: 20px;
-    color: var(--gray-dim);
-    font-size: 13px;
-    flex-wrap: wrap;
-    gap: 16px;
-  }
-
-  .footer-bottom .by {
-    color: var(--accent);
-    font-weight: 700;
-    letter-spacing: 1px;
-    font-family: 'Consolas', 'Monaco', monospace;
-  }
-
-  /* ============ RESPONSIVE ============ */
-  @media (max-width: 1024px) {
-    .dl-content {
-      grid-template-columns: 1fr;
-      gap: 40px;
-    }
-
-    .dl-visual { min-height: 400px; }
-
-    .phone-ios {
-      position: static;
-      transform: none;
-      margin: 20px auto 0;
-    }
-
-    .phone-android {
-      margin: 0 auto;
-    }
-  }
-
-  @media (max-width: 768px) {
-    nav { padding: 16px 20px; }
-    .nav-links { display: none; }
-
-    .dl-hero { padding: 120px 20px 30px; }
-    .dl-tabs-wrap { padding: 0 20px 60px; }
-
-    .dl-tabs {
-      gap: 4px;
-      padding: 4px;
-    }
-
-    .dl-tab {
-      padding: 11px 16px;
-      font-size: 13px;
-    }
-
-    .dl-tab svg { display: none; }
-
-    .browser-body,
-    .win-body { height: 280px; }
-
-    .mini-app { grid-template-columns: 70px 1fr; }
-
-    .phone-android {
-      width: 200px;
-      height: 420px;
-    }
-
-    .code-line-text { font-size: 11px; }
-  }
-
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb {
-    background: var(--gray-dim);
-    border-radius: 10px;
-    border: 2px solid var(--bg);
-  }
-  ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
-
-  ::selection {
-    background: var(--accent);
-    color: var(--white);
-  }
+  @media (max-width: 768px) { nav { padding: 16px 20px; } .nav-links { display: none; } .dl-hero { padding: 120px 20px 30px; } .dl-tabs-wrap { padding: 0 20px 60px; } }
 </style>
 </head>
 <body>
 
-<div class="bg-layer"></div>
-
 <nav>
-  <a href="/" class="nav-logo">
-    <div class="nav-logo-mark">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-        <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="white" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-      </svg>
-    </div>
-    Flash
-  </a>
+  <a href="/" class="nav-logo"><div class="nav-logo-mark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="white"/></svg></div>Flash</a>
   <ul class="nav-links">
     <li><a href="/#features">Возможности</a></li>
-    <li><a href="/#security">Безопасность</a></li>
     <li><a href="/download.html">Скачать</a></li>
-    <li><a href="/#support">Поддержка</a></li>
+    <li><a href="/support.html">Поддержка</a></li>
   </ul>
   <a href="/web.html" class="nav-cta">Открыть Flash</a>
 </nav>
 
 <header class="dl-hero">
   <div class="section-tag">Скачать</div>
-  <h1>
-    Выбери свою<br>
-    <span class="accent">платформу.</span>
-  </h1>
-  <p>
-    Flash работает везде. Выбирай как тебе удобно — <strong>веб, Windows или Android</strong>.
-  </p>
+  <h1>Выбери свою<br><span class="accent">платформу.</span></h1>
+  <p>Flash работает везде. Выбирай как тебе удобно — <strong>веб, Windows или Android</strong>.</p>
 </header>
 
 <div class="dl-tabs-wrap">
-
   <div class="dl-tabs">
-    <button class="dl-tab active" data-tab="web">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"/>
-        <path d="M2 12h20"/>
-        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-      </svg>
-      Веб-версия
-    </button>
-    <button class="dl-tab" data-tab="windows">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="7" height="7"/>
-        <rect x="14" y="3" width="7" height="7"/>
-        <rect x="14" y="14" width="7" height="7"/>
-        <rect x="3" y="14" width="7" height="7"/>
-      </svg>
-      Windows
-    </button>
-    <button class="dl-tab" data-tab="android">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="5" y="2" width="14" height="20" rx="3"/>
-        <line x1="12" y1="18" x2="12" y2="18"/>
-      </svg>
-      Android
-    </button>
-    <button class="dl-tab" data-tab="source">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="m16 18 6-6-6-6"/>
-        <path d="m8 6-6 6 6 6"/>
-      </svg>
-      Исходный код
-    </button>
+    <button class="dl-tab active" data-tab="web">Веб-версия</button>
+    <button class="dl-tab" data-tab="windows">Windows</button>
+    <button class="dl-tab" data-tab="android">Android</button>
+    <button class="dl-tab" data-tab="source">Исходный код</button>
   </div>
 
-  <!-- ============ ВКЛАДКА: ВЕБ-ВЕРСИЯ ============ -->
+  <!-- ВЕБ -->
   <div class="dl-content-wrap active" data-tab="web">
-    <div class="dl-content">
-      <div class="dl-content-text">
-        <h2>
-          Веб-версия<br>
-          <span class="accent">без установки.</span>
-        </h2>
-        <p>
-          Ничего не надо скачивать. <strong>Открываешь прямо в браузере</strong> — и получаешь
-          всё то же, что в Windows и Android.
-        </p>
-        <p>
-          Работает на <strong>всех системах</strong> и в <strong>любом браузере</strong>:
-          Chrome, Safari, Firefox, Edge.
-        </p>
-        <ul class="dl-features">
-          <li>
-            <div class="check">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 6 9 17l-5-5"/>
-              </svg>
-            </div>
-            Без установки и регистрации в магазинах
-          </li>
-          <li>
-            <div class="check">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 6 9 17l-5-5"/>
-              </svg>
-            </div>
-            Один код — везде одинаково
-          </li>
-          <li>
-            <div class="check">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 6 9 17l-5-5"/>
-              </svg>
-            </div>
-            PWA — можно установить как приложение
-          </li>
-        </ul>
-        <div class="dl-actions">
-          <a href="/web.html" class="dl-action">
-            Открыть в браузере
-            <span class="arrow">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
-              </svg>
-            </span>
-          </a>
-        </div>
-      </div>
-
-      <div class="dl-visual">
-        <div class="browser-mockup">
-          <div class="browser-top">
-            <div class="browser-dots">
-              <span></span><span></span><span></span>
-            </div>
-            <div class="browser-tab">
-              <div class="favicon">
-                <svg viewBox="0 0 24 24" fill="none">
-                  <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="white" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-                </svg>
-              </div>
-              Flash — мессенджер
-            </div>
-            <div class="browser-url-bar">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="4" y="11" width="16" height="10" rx="3"/>
-                <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
-              </svg>
-              flash-msg.netlify.app/web.html
-            </div>
-          </div>
-          <div class="browser-body">
-            <div class="mini-app">
-              <div class="mini-sidebar">
-                <div class="mini-sidebar-logo">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="white" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-                  </svg>
-                </div>
-                <div class="mini-chat-item active">
-                  <div class="mini-avatar"></div>
-                  <div class="mini-line"></div>
-                </div>
-                <div class="mini-chat-item">
-                  <div class="mini-avatar" style="background: #8338ec;"></div>
-                  <div class="mini-line"></div>
-                </div>
-                <div class="mini-chat-item">
-                  <div class="mini-avatar" style="background: #3a86ff;"></div>
-                  <div class="mini-line"></div>
-                </div>
-              </div>
-              <div class="mini-chat">
-                <div class="mini-msg mini-msg-in">Привет! Ты в вебе?</div>
-                <div class="mini-msg mini-msg-out">Да, без установки</div>
-                <div class="mini-msg mini-msg-in">Работает везде?</div>
-                <div class="mini-msg mini-msg-out">На всех системах и браузерах</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- iPhone с iOS интерфейсом -->
-        <div class="phone-ios">
-          <div class="phone-ios-screen">
-            <div class="ios-status">
-              <span>9:41</span>
-              <div class="ios-status-right">
-                <svg width="10" height="8" viewBox="0 0 16 12" fill="currentColor">
-                  <rect x="0" y="8" width="3" height="4" rx="1"/>
-                  <rect x="4" y="5" width="3" height="7" rx="1"/>
-                  <rect x="8" y="2" width="3" height="10" rx="1"/>
-                  <rect x="12" y="0" width="3" height="12" rx="1" opacity="0.4"/>
-                </svg>
-                <svg width="14" height="8" viewBox="0 0 24 12" fill="currentColor">
-                  <rect x="0" y="0" width="20" height="10" rx="3" fill="none" stroke="currentColor" stroke-width="1.2"/>
-                  <rect x="2" y="2" width="14" height="6" rx="1.5"/>
-                </svg>
-              </div>
-            </div>
-            <div class="mini-app" style="grid-template-columns: 60px 1fr;">
-              <div class="mini-sidebar" style="padding: 8px 6px;">
-                <div class="mini-sidebar-logo" style="width: 24px; height: 24px;">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                    <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="white" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-                  </svg>
-                </div>
-                <div class="mini-chat-item active" style="height: 26px; padding: 4px 6px;">
-                  <div class="mini-avatar" style="width: 16px; height: 16px;"></div>
-                  <div class="mini-line"></div>
-                </div>
-                <div class="mini-chat-item" style="height: 26px; padding: 4px 6px;">
-                  <div class="mini-avatar" style="width: 16px; height: 16px; background: #8338ec;"></div>
-                  <div class="mini-line"></div>
-                </div>
-              </div>
-              <div class="mini-chat" style="padding: 10px; gap: 6px;">
-                <div class="mini-msg mini-msg-in" style="font-size: 8px; padding: 5px 8px;">Привет!</div>
-                <div class="mini-msg mini-msg-out" style="font-size: 8px; padding: 5px 8px;">Здарова</div>
-                <div class="mini-msg mini-msg-in" style="font-size: 8px; padding: 5px 8px;">Как дела?</div>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div class="dl-content-text">
+      <h2>Веб-версия<br><span class="accent">без установки.</span></h2>
+      <p>Ничего не надо скачивать. <strong>Открываешь прямо в браузере</strong> — и получаешь всё то же, что в Windows и Android.</p>
+      <div class="dl-actions">
+        <a href="/web.html" class="dl-action">Открыть в браузере →</a>
       </div>
     </div>
   </div>
 
-  <!-- ============ ВКЛАДКА: WINDOWS ============ -->
+  <!-- WINDOWS -->
   <div class="dl-content-wrap" data-tab="windows">
-    <div class="dl-content">
-      <div class="dl-content-text">
-        <h2>
-          Клиент для<br>
-          <span class="accent">Windows.</span>
-        </h2>
-        <p>
-          Полноценное приложение с <strong>кастомной рамкой</strong> в стиле современных
-          мессенджеров. Установщик в один клик, ярлыки, трей.
-        </p>
-        <p>
-          Работает на <strong>Windows 10 и 11</strong>. Обновления приходят автоматически.
-        </p>
-        <ul class="dl-features">
-          <li>
-            <div class="check">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 6 9 17l-5-5"/>
-              </svg>
-            </div>
-            Кастомная рамка, трей, ярлыки
-          </li>
-          <li>
-            <div class="check">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 6 9 17l-5-5"/>
-              </svg>
-            </div>
-            Установщик .exe + портативная версия
-          </li>
-          <li>
-            <div class="check">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 6 9 17l-5-5"/>
-              </svg>
-            </div>
-            Автообновления
-          </li>
-        </ul>
-        <div class="dl-actions">
-          <a href="/downloads/flash-setup-x64.exe" class="dl-action">
-            Скачать .exe
-            <span class="arrow">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 19V5"/><path d="m5 12 7-7 7 7"/>
-              </svg>
-            </span>
-          </a>
-        </div>
-      </div>
-
-      <div class="dl-visual">
-        <div class="win-frame">
-          <div class="win-titlebar">
-            <div class="win-titlebar-left">
-              <div class="win-nav-icon">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>
-                </svg>
-              </div>
-              <div class="win-nav-icon">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
-                </svg>
-              </div>
-              <div class="win-nav-icon">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-                  <path d="M21 3v5h-5"/>
-                </svg>
-              </div>
-            </div>
-            <div class="win-titlebar-center">
-              <div class="win-title-logo">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                  <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="white" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-                </svg>
-              </div>
-              <span class="win-title-text">Flash</span>
-            </div>
-            <div class="win-titlebar-right">
-              <div class="win-ctrl">
-                <svg width="10" height="10" viewBox="0 0 10 10">
-                  <line x1="1" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1.2"/>
-                </svg>
-              </div>
-              <div class="win-ctrl">
-                <svg width="10" height="10" viewBox="0 0 10 10">
-                  <rect x="1" y="1" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.2"/>
-                </svg>
-              </div>
-              <div class="win-ctrl win-ctrl-close">
-                <svg width="10" height="10" viewBox="0 0 10 10">
-                  <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="1.2"/>
-                  <line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="1.2"/>
-                </svg>
-              </div>
-            </div>
-          </div>
-          <div class="win-body">
-            <div class="mini-app">
-              <div class="mini-sidebar">
-                <div class="mini-sidebar-logo">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="white" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-                  </svg>
-                </div>
-                <div class="mini-chat-item active">
-                  <div class="mini-avatar"></div>
-                  <div class="mini-line"></div>
-                </div>
-                <div class="mini-chat-item">
-                  <div class="mini-avatar" style="background: #8338ec;"></div>
-                  <div class="mini-line"></div>
-                </div>
-                <div class="mini-chat-item">
-                  <div class="mini-avatar" style="background: #3a86ff;"></div>
-                  <div class="mini-line"></div>
-                </div>
-                <div class="mini-chat-item">
-                  <div class="mini-avatar" style="background: #22c55e;"></div>
-                  <div class="mini-line"></div>
-                </div>
-              </div>
-              <div class="mini-chat">
-                <div class="mini-msg mini-msg-in">Привет! Ты в Windows-клиенте?</div>
-                <div class="mini-msg mini-msg-out">Да, кастомная рамка топ</div>
-                <div class="mini-msg mini-msg-in">Трей работает?</div>
-                <div class="mini-msg mini-msg-out">Всё работает, крестик сворачивает</div>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div class="dl-content-text">
+      <h2>Клиент для<br><span class="accent">Windows.</span></h2>
+      <p>Полноценное приложение с <strong>кастомной рамкой</strong>, треем и уведомлениями.</p>
+      <div class="dl-actions">
+        <a href="https://github.com/k0rzet-creator/flash-messenger/releases/download/v1.0.0-beta/Flash.Setup.1.0.0.exe" class="dl-action">
+          Скачать .exe (Установщик)
+        </a>
+        <a href="https://github.com/k0rzet-creator/flash-messenger/releases/download/v1.0.0-beta/Flash.1.0.0.Potable.exe" class="dl-action dl-action-ghost">
+          Скачать .exe (Портативная)
+        </a>
       </div>
     </div>
   </div>
 
-  <!-- ============ ВКЛАДКА: ANDROID ============ -->
+  <!-- ANDROID -->
   <div class="dl-content-wrap" data-tab="android">
-    <div class="dl-content">
-      <div class="dl-content-text">
-        <h2>
-          Клиент для<br>
-          <span class="accent">Android.</span>
-        </h2>
-        <p>
-          Полноценное приложение для Android. <strong>Установка в один тап</strong> из RuStore.
-        </p>
-        <p>
-          Тот же интерфейс, что в Windows и вебе — но <strong>оптимизированный под телефон</strong>.
-        </p>
-        <ul class="dl-features">
-          <li>
-            <div class="check">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 6 9 17l-5-5"/>
-              </svg>
-            </div>
-            Установка из RuStore
-          </li>
-          <li>
-            <div class="check">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 6 9 17l-5-5"/>
-              </svg>
-            </div>
-            Push-уведомления
-          </li>
-          <li>
-            <div class="check">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 6 9 17l-5-5"/>
-              </svg>
-            </div>
-            Полная синхронизация с другими устройствами
-          </li>
-        </ul>
-        <div class="dl-actions">
-          <a href="https://www.rustore.ru/catalog/app/com.flash.messenger" target="_blank" rel="noopener" class="dl-action">
-            Открыть в RuStore
-            <span class="arrow">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
-              </svg>
-            </span>
-          </a>
-        </div>
-      </div>
-
-      <div class="dl-visual">
-        <div class="phone-android">
-          <div class="phone-android-screen">
-            <div class="mini-app" style="grid-template-columns: 70px 1fr;">
-              <div class="mini-sidebar" style="padding: 10px 6px;">
-                <div class="mini-sidebar-logo" style="width: 26px; height: 26px; margin-bottom: 8px;">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                    <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="white" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-                  </svg>
-                </div>
-                <div class="mini-chat-item active" style="height: 28px; padding: 5px 6px;">
-                  <div class="mini-avatar" style="width: 18px; height: 18px;"></div>
-                  <div class="mini-line"></div>
-                </div>
-                <div class="mini-chat-item" style="height: 28px; padding: 5px 6px;">
-                  <div class="mini-avatar" style="width: 18px; height: 18px; background: #8338ec;"></div>
-                  <div class="mini-line"></div>
-                </div>
-                <div class="mini-chat-item" style="height: 28px; padding: 5px 6px;">
-                  <div class="mini-avatar" style="width: 18px; height: 18px; background: #3a86ff;"></div>
-                  <div class="mini-line"></div>
-                </div>
-              </div>
-              <div class="mini-chat" style="padding: 12px; gap: 8px;">
-                <div class="mini-msg mini-msg-in" style="font-size: 9px; padding: 6px 9px;">Здарова!</div>
-                <div class="mini-msg mini-msg-out" style="font-size: 9px; padding: 6px 9px;">С телефона?</div>
-                <div class="mini-msg mini-msg-in" style="font-size: 9px; padding: 6px 9px;">Да, из RuStore поставил</div>
-                <div class="mini-msg mini-msg-out" style="font-size: 9px; padding: 6px 9px;">Топ</div>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div class="dl-content-text">
+      <h2>Клиент для<br><span class="accent">Android.</span></h2>
+      <p>Полноценное приложение. <strong>Установка в один тап</strong>.</p>
+      <div class="dl-actions">
+        <a href="https://github.com/k0rzet-creator/flash-messenger/releases/download/v1.0.0-beta/flash-android.apk" class="dl-action">
+          Скачать .apk
+        </a>
+        <a href="https://www.rustore.ru/catalog/app/com.k0rzet.flash" target="_blank" class="dl-action dl-action-ghost">
+          Открыть в RuStore
+        </a>
       </div>
     </div>
   </div>
 
-  <!-- ============ ВКЛАДКА: ИСХОДНИКИ ============ -->
+  <!-- ИСХОДНИКИ -->
   <div class="dl-content-wrap" data-tab="source">
-    <div class="dl-content">
-      <div class="dl-content-text">
-        <h2>
-          Открытый<br>
-          <span class="accent">исходный код.</span>
-        </h2>
-        <p>
-          Весь код Flash открыт. <strong>Скачивай, изучай, меняй</strong> — и делай
-          свой мессенджер.
-        </p>
-        <p>
-          Хочешь <strong>свой сервер</strong>? Разверни на своём железе. Хочешь
-          <strong>свой клиент</strong>? Собери под себя. Возможности бесконечны.
-        </p>
-        <ul class="dl-features">
-          <li>
-            <div class="check">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 6 9 17l-5-5"/>
-              </svg>
-            </div>
-            Клиент: HTML, CSS, JavaScript
-          </li>
-          <li>
-            <div class="check">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 6 9 17l-5-5"/>
-              </svg>
-            </div>
-            Сервер: Node.js + SQLite
-          </li>
-          <li>
-            <div class="check">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 6 9 17l-5-5"/>
-              </svg>
-            </div>
-            Лицензия MIT — делай что хочешь
-          </li>
-        </ul>
-        <div class="dl-actions">
-          <a href="/downloads/flash-source.zip" class="dl-action">
-            Скачать исходники
-            <span class="arrow">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 19V5"/><path d="m5 12 7-7 7 7"/>
-              </svg>
-            </span>
-          </a>
-          <a href="#" class="dl-action dl-action-ghost">
-            Документация
-          </a>
-        </div>
-      </div>
-
-      <div class="dl-visual">
-        <div class="code-block">
-          <div class="code-header">
-            <div class="code-header-dot" style="background: #ff5f57;"></div>
-            <div class="code-header-dot" style="background: #febc2e;"></div>
-            <div class="code-header-dot" style="background: #28c840;"></div>
-            <span class="code-header-file">server.js</span>
-          </div>
-          <div class="code-body">
-            <div class="code-line"><span class="code-line-num">1</span><span class="code-line-text"><span class="c-keyword">const</span> express <span class="c-op">=</span> <span class="c-func">require</span>(<span class="c-string">"express"</span>);</span></div>
-            <div class="code-line"><span class="code-line-num">2</span><span class="code-line-text"><span class="c-keyword">const</span> WebSocket <span class="c-op">=</span> <span class="c-func">require</span>(<span class="c-string">"ws"</span>);</span></div>
-            <div class="code-line"><span class="code-line-num">3</span><span class="code-line-text"><span class="c-keyword">const</span> jwt <span class="c-op">=</span> <span class="c-func">require</span>(<span class="c-string">"jsonwebtoken"</span>);</span></div>
-            <div class="code-line"><span class="code-line-num">4</span><span class="code-line-text"></span></div>
-            <div class="code-line"><span class="code-line-num">5</span><span class="code-line-text"><span class="c-comment">// Подключаемся к базе</span></span></div>
-            <div class="code-line"><span class="code-line-num">6</span><span class="code-line-text"><span class="c-keyword">const</span> db <span class="c-op">=</span> <span class="c-func">require</span>(<span class="c-string">"./database"</span>);</span></div>
-            <div class="code-line"><span class="code-line-num">7</span><span class="code-line-text"></span></div>
-            <div class="code-line"><span class="code-line-num">8</span><span class="code-line-text"><span class="c-keyword">const</span> app <span class="c-op">=</span> <span class="c-func">express</span>();</span></div>
-            <div class="code-line"><span class="code-line-num">9</span><span class="code-line-text">app.<span class="c-func">use</span>(express.<span class="c-func">json</span>());</span></div>
-            <div class="code-line"><span class="code-line-num">10</span><span class="code-line-text"></span></div>
-            <div class="code-line"><span class="code-line-num">11</span><span class="code-line-text">app.<span class="c-func">post</span>(<span class="c-string">"/api/login"</span>, <span class="c-keyword">async</span> (req, res) <span class="c-op">=&gt;</span> {</span></div>
-            <div class="code-line"><span class="code-line-num">12</span><span class="code-line-text">  <span class="c-keyword">const</span> { username, password } <span class="c-op">=</span> req.body;</span></div>
-            <div class="code-line"><span class="code-line-num">13</span><span class="code-line-text">  <span class="c-keyword">const</span> user <span class="c-op">=</span> <span class="c-keyword">await</span> db.<span class="c-func">findUser</span>(username);</span></div>
-            <div class="code-line"><span class="code-line-num">14</span><span class="code-line-text">  <span class="c-keyword">if</span> (<span class="c-op">!</span>user) <span class="c-keyword">return</span> res.<span class="c-func">status</span>(<span class="c-number">401</span>);</span></div>
-            <div class="code-line"><span class="code-line-num">15</span><span class="code-line-text">  <span class="c-keyword">const</span> token <span class="c-op">=</span> jwt.<span class="c-func">sign</span>({ id: user.id }, SECRET);</span></div>
-            <div class="code-line"><span class="code-line-num">16</span><span class="code-line-text">  res.<span class="c-func">json</span>({ token });</span></div>
-            <div class="code-line"><span class="code-line-num">17</span><span class="code-line-text">});</span></div>
-            <div class="code-line"><span class="code-line-num">18</span><span class="code-line-text"></span></div>
-            <div class="code-line"><span class="code-line-num">19</span><span class="code-line-text"><span class="c-comment">// WebSocket для realtime</span></span></div>
-            <div class="code-line"><span class="code-line-num">20</span><span class="code-line-text"><span class="c-keyword">const</span> wss <span class="c-op">=</span> <span class="c-keyword">new</span> WebSocket.<span class="c-func">Server</span>({</span></div>
-            <div class="code-line"><span class="code-line-num">21</span><span class="code-line-text">  server, path: <span class="c-string">"/ws"</span></span></div>
-            <div class="code-line"><span class="code-line-num">22</span><span class="code-line-text">});</span></div>
-            <div class="code-line"><span class="code-line-num">23</span><span class="code-line-text"></span></div>
-            <div class="code-line"><span class="code-line-num">24</span><span class="code-line-text">server.<span class="c-func">listen</span>(<span class="c-number">8080</span>);</span></div>
-          </div>
-        </div>
+    <div class="dl-content-text">
+      <h2>Открытый<br><span class="accent">исходный код.</span></h2>
+      <p>Весь код Flash открыт. <strong>Скачивай, изучай, меняй</strong> — и делай свой мессенджер.</p>
+      <div class="dl-actions">
+        <a href="https://github.com/k0rzet-creator/flash-messenger" class="dl-action">
+          Перейти на GitHub
+        </a>
       </div>
     </div>
   </div>
@@ -1490,18 +144,12 @@
 </div>
 
 <div class="dl-back">
-  <a href="/">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M19 12H5"/>
-      <path d="m12 19-7-7 7-7"/>
-    </svg>
-    Вернуться на главную
-  </a>
+  <a href="/">← Вернуться на главную</a>
 </div>
 
 <footer>
   <div class="footer-bottom">
-    <div>© 2026 Flash Messenger. Открытый код под лицензией MIT.</div>
+    <div>© 2026 Flash Messenger. MIT License.</div>
     <div>BY <span class="by">K0RZET</span></div>
   </div>
 </footer>
@@ -1509,32 +157,15 @@
 <script>
   const tabs = document.querySelectorAll(".dl-tab");
   const contents = document.querySelectorAll(".dl-content-wrap");
-
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
       const target = tab.dataset.tab;
-
       tabs.forEach((t) => t.classList.remove("active"));
       contents.forEach((c) => c.classList.remove("active"));
-
       tab.classList.add("active");
-      const content = document.querySelector(`.dl-content-wrap[data-tab="${target}"]`);
-      if (content) content.classList.add("active");
+      document.querySelector(`.dl-content-wrap[data-tab="${target}"]`).classList.add("active");
     });
   });
-
-  // Автовыбор вкладки из hash
-  const hash = window.location.hash.replace("#", "");
-  if (hash && ["web", "windows", "android", "source"].includes(hash)) {
-    tabs.forEach((t) => t.classList.remove("active"));
-    contents.forEach((c) => c.classList.remove("active"));
-
-    const tab = document.querySelector(`.dl-tab[data-tab="${hash}"]`);
-    const content = document.querySelector(`.dl-content-wrap[data-tab="${hash}"]`);
-    if (tab) tab.classList.add("active");
-    if (content) content.classList.add("active");
-  }
 </script>
-
 </body>
 </html>
