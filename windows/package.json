@@ -25,9 +25,6 @@
             "titlebar.html",
             "titlebar.css",
             "titlebar.js",
-            "index.html",
-            "app.js",
-            "style.css",
             "client.json",
             "icon.ico"
         ],
