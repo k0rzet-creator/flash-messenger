@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Flash</string>
+    <string name="title_activity_main">Flash</string>
+    <string name="package_name">com.k0rzet.flash</string>
+    <string name="custom_url_scheme">com.k0rzet.flash</string>
+</resources>

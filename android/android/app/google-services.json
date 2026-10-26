@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "624109285096",
+    "project_id": "k0rzet-flash-messenger",
+    "storage_bucket": "k0rzet-flash-messenger.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:624109285096:android:61841b4f98cf0ade4ae35d",
+        "android_client_info": {
+          "package_name": "com.k0rzet.flash"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBSpl-c6iakb4EV1zzTN0FmaFSzsSD2snE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

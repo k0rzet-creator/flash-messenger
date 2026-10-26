@@ -1,0 +1,10 @@
+{
+  "appId": "com.k0rzet.flash",
+  "appName": "Flash",
+  "webDir": "public",
+  "server": {
+    "url": "https://flash-msg.site/web.html",
+    "cleartext": true
+  },
+  "bundledWebRuntime": false
+}
