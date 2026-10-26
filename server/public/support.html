@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flash — Поддержка и Политика</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { background: #08080a; color: #fff; line-height: 1.6; padding: 40px 20px; }
+  .container { max-width: 800px; margin: 0 auto; background: #0f0f12; padding: 40px; border-radius: 12px; border: 1px solid #1c1c24; }
+  
+  h1 { font-size: 32px; font-weight: 800; margin-bottom: 24px; color: #ff2d6f; }
+  h2 { font-size: 24px; font-weight: 700; margin-top: 32px; margin-bottom: 16px; border-bottom: 1px solid #1c1c24; padding-bottom: 8px; }
+  p { font-size: 15px; color: #8b8b96; margin-bottom: 12px; }
+  ul { margin-left: 20px; margin-bottom: 16px; color: #8b8b96; font-size: 15px; }
+  li { margin-bottom: 8px; }
+  a { color: #ff2d6f; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .back-btn { display: inline-block; margin-bottom: 24px; color: #8b8b96; text-decoration: none; font-size: 14px; }
+  .back-btn:hover { color: #fff; }
+  .alert { background: rgba(255, 45, 111, 0.1); border-left: 4px solid #ff2d6f; padding: 16px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <a href="/" class="back-btn">← На главную</a>
+  
+  <h1>Поддержка Flash</h1>
+  <p>Здесь ты найдешь ответы на частые вопросы, правила и политику конфиденциальности.</p>
+
+  <h2>1. Политика конфиденциальности</h2>
+  <p><strong>Мы не собираем и не храним ваши данные.</strong></p>
+  <p>Flash — это открытый мессенджер. Все сообщения шифруются на вашем устройстве алгоритмом AES-256-GCM перед отправкой. Сервер хранит только зашифрованный текст (набор символов), который невозможно прочитать без вашего ключа.</p>
+  <ul>
+    <li>Мы не собираем статистику, не используем аналитику и трекеры.</li>
+    <li>Мы не запрашиваем доступ к вашим контактам, камере или микрофону без явной необходимости (только при отправке файлов в будущих обновлениях).</li>
+    <li>Вы можете подключиться к официальному серверу или поднять свой собственный. В случае своего сервера, вы полностью контролируете данные.</li>
+  </ul>
+
+  <h2>2. Удаление аккаунта и данных</h2>
+  <p>Вы имеете право на полное удаление своих данных в любой момент.</p>
+  <div class="alert">
+    <strong>Как удалить аккаунт:</strong>
+    <p>Зайдите в приложение Flash, откройте <strong>Настройки (Профиль)</strong>, найдите раздел <strong>«Опасная зона»</strong> и нажмите <strong>«Сбросить базу и выйти»</strong>. Это удалит все локальные данные и ключи шифрования на вашем устройстве.</p>
+    <p>Если вы хотите удалить аккаунт с сервера, напишите на почту поддержки (указана ниже) с вашим username. Администратор сервера удалит запись из базы в течение 24 часов. Без вашего ключа шифрования прочитать сообщения невозможно, они будут стерты навсегда.</p>
+  </div>
+
+  <h2>3. Фиксация багов и жалобы</h2>
+  <p>Если вы нашли ошибку, или столкнулись со спамом / мошенничеством, сообщите нам:</p>
+  <ul>
+    <li><strong>Баги:</strong> Опишите проблему и приложите скриншот. Создайте Issue на GitHub: <a href="https://github.com/k0rzet-creator/flash-messenger/issues" target="_blank">github.com/k0rzet-creator/flash-messenger/issues</a>.</li>
+    <li><strong>Жалобы на пользователей:</strong> Пришлите username нарушителя и суть нарушения на почту поддержки.</li>
+  </ul>
+
+  <h2>4. Контакты поддержки</h2>
+  <p>По всем вопросам вы можете связаться с разработчиком:</p>
+  <ul>
+    <li><strong>Telegram:</strong> <a href="https://t.me/k0rz3t" target="_blank">@k0rz3t</a></li>
+    <li><strong>Email:</strong> flash.msg.ofic@gmail.com</li>
+    <li><strong>Сообщество:</strong> <a href="https://t.me/flash_messenger" target="_blank">@flash_messenger</a></li>
+  </ul>
+
+  <h2>5. Лицензия</h2>
+  <p>Проект Flash распространяется под лицензией <strong>GPL 2.0</strong>. Вы можете свободно использовать, изменять и распространять код приложения при условии сохранения уведомления об авторских правах. Полный текст лицензии находится в файле LICENSE в репозитории.</p>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#ff2d6f">
+<title>Flash — мессенджер</title>
+<link rel="stylesheet" href="style.css?v=1029">
+</head>
+<body>
+
+<div class="bg-glow"></div>
+
+<button id="server-btn-auth" class="server-btn server-btn-auth" title="Настройки">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+</button>
+
+<!-- АВТОРИЗАЦИЯ -->
+<div id="auth-screen" class="screen active">
+    <div class="auth-wrap">
+        <div class="auth-header">
+            <div class="auth-logo">
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="white" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </div>
+            <h1 class="auth-title">Flash</h1>
+            <p class="auth-sub">просто. быстро. надёжно.</p>
+        </div>
+
+        <div class="active-server-info">
+            <div class="server-dot" id="auth-server-dot"></div>
+            <div class="server-info-text">
+                <div class="server-info-name" id="auth-server-name">Загрузка...</div>
+                <div class="server-info-addr" id="auth-server-addr">—</div>
+            </div>
+        </div>
+
+        <div class="auth-toggle">
+            <div class="auth-toggle-slider" id="auth-slider"></div>
+            <button class="auth-toggle-btn active" data-mode="login" id="tab-login">Вход</button>
+            <button class="auth-toggle-btn" data-mode="register" id="tab-register">Регистрация</button>
+        </div>
+
+        <div class="auth-form">
+            <div class="auth-field hidden" id="field-username">
+                <div class="auth-field-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg></div>
+                <input id="auth-username" type="text" placeholder="username" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="auth-field" id="field-login">
+                <div class="auth-field-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg></div>
+                <input id="login-username" type="text" placeholder="username" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="auth-field" id="field-password">
+                <div class="auth-field-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="3"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+                <input id="auth-password" type="password" placeholder="пароль" autocomplete="off">
+            </div>
+            
+            <div style="display:flex; align-items:center; margin-top:5px; padding-left:5px;">
+                <input type="checkbox" id="auto-login-checkbox" checked style="width: 16px; height: 16px; margin-right: 10px; accent-color: var(--accent); cursor: pointer;">
+                <label for="auto-login-checkbox" style="color: var(--gray); font-size: 13px; cursor: pointer; user-select: none;">Запомнить меня (автовход)</label>
+            </div>
+
+            <div id="auth-step-2" class="hidden" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                <p style="color: var(--accent); font-size: 13px; text-align: center;">Шаг 2: Настройка профиля</p>
+                <div class="auth-field">
+                    <div class="auth-field-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></div>
+                    <input id="reg-display-name" type="text" placeholder="Отображаемое имя">
+                </div>
+                <div style="display: flex; align-items: center; gap: 15px; padding: 10px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 18px;">
+                    <div id="reg-avatar-preview" style="width: 50px; height: 50px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 20px; overflow: hidden;">?</div>
+                    <div style="flex: 1;">
+                        <div style="font-size: 13px; font-weight: bold; margin-bottom: 4px;">Аватарка</div>
+                        <input type="file" id="reg-avatar-input" accept="image/*" style="font-size: 11px; color: var(--gray);">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button id="auth-submit" class="btn-primary btn-full">Войти</button>
+        <div id="auth-status" class="auth-status"></div>
+        <div class="auth-hint">Нет аккаунта? <a href="#" id="hint-switch">Создай за 10 секунд</a></div>
+    </div>
+</div>
+
+<!-- ПРИЛОЖЕНИЕ -->
+<div id="app-screen" class="screen">
+    <aside class="sidebar">
+        <div class="sidebar-head">
+            <div class="logo">
+                <div class="logo-mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="white" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+                <span>Flash</span>
+            </div>
+            <button id="settings-btn" class="server-btn server-btn-small" title="Настройки">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
+        </div>
+
+        <div class="sidebar-search">
+            <div class="search-wrap">
+                <span class="search-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+                <input id="search-input" type="text" placeholder="Поиск..." autocomplete="off" spellcheck="false">
+            </div>
+        </div>
+
+        <button id="new-chat-btn" class="btn-primary btn-new-chat">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            <span>Новый чат</span>
+        </button>
+
+        <div id="chat-list" class="chat-list"></div>
+
+        <div class="sidebar-footer">
+            <button id="logout-btn" class="logout-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+                <span id="logout-name">Выйти</span>
+            </button>
+        </div>
+    </aside>
+
+    <main class="chat-area">
+        <div id="empty-state" class="empty-state">
+            <div class="empty-icon"><svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div>
+            <div class="empty-text">Выбери чат слева<br>или создай новый</div>
+        </div>
+
+        <div id="active-chat" class="active-chat hidden">
+            <header class="chat-header">
+                <button id="back-btn" class="icon-btn back-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg></button>
+                <div class="chat-header-info">
+                    <div id="chat-avatar-container"></div>
+                    <div>
+                        <div id="chat-name" class="chat-name">Чат</div>
+                        <div class="chat-status"><span id="chat-header-status">не в сети</span></div>
+                    </div>
+                </div>
+            </header>
+
+            <div id="messages" class="messages"></div>
+
+            <!-- ПОПОВЕР СТИКЕРОВ (БЕЗ ИНЛАЙН-СТИЛЕЙ) -->
+            <div id="stickers-popover" class="hidden">
+                <div style="padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-weight: 800; font-size: 15px;">Стикеры</div>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="btn-create-pack" style="background: transparent; border: none; color: var(--accent); font-size: 24px; cursor: pointer; display: flex; align-items: center;" title="Создать пак">+</button>
+                        <button id="stickers-close-btn" style="background: transparent; border: none; color: var(--gray); font-size: 18px; cursor: pointer;">✕</button>
+                    </div>
+                </div>
+                <div id="stickers-container" style="flex: 1; overflow-y: auto; padding: 15px;">
+                    <!-- Сюда рендерятся паки -->
+                </div>
+            </div>
+
+            <!-- МЕНЮ ПРИКРЕПЛЕНИЯ (БЕЗ ИНЛАЙН-СТИЛЕЙ) -->
+            <div id="attach-menu" class="attach-menu hidden">
+                <button class="attach-item" id="attach-file-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    Файл
+                </button>
+                <button class="attach-item" id="attach-gallery-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    Галерея
+                </button>
+                <button class="attach-item" id="attach-camera-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    Камера
+                </button>
+            </div>
+
+            <div class="input-area" style="position: relative;">
+                <div id="reply-preview" style="display:none; position:absolute; top:-40px; left:20px; padding:6px 12px; border-radius:12px; font-size:12px; color:var(--gray); border:1px solid var(--border); align-items: center; gap: 8px; z-index: 5;">
+                    <span>Ответ: <span id="reply-text" style="color:var(--white);"></span></span>
+                    <button id="cancel-reply" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:14px;display:flex;align-items:center;">✕</button>
+                </div>
+
+                <button id="sticker-toggle-btn" class="icon-btn" style="width: 46px; height: 46px; border-radius: 50%; background: transparent; border: 1px solid var(--border); flex-shrink: 0; margin-right: 10px;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                        <line x1="9" y1="9" x2="9.01" y2="9"/>
+                        <line x1="15" y1="9" x2="15.01" y2="9"/>
+                    </svg>
+                </button>
+
+                <button id="attach-btn" class="icon-btn" style="width: 46px; height: 46px; border-radius: 50%; background: transparent; border: 1px solid var(--border); flex-shrink: 0; margin-right: 10px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                    </svg>
+                </button>
+                
+                <input type="file" id="file-input" style="display: none;">
+                <input type="file" id="camera-input" accept="image/*,video/*" capture="environment" style="display: none;">
+
+                <div class="input-wrap">
+                    <input id="msg-input" type="text" placeholder="Пиши что-нибудь..." autocomplete="off" spellcheck="false">
+                </div>
+                <button id="send-btn" class="send-btn"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- КОНТЕКСТНЫЕ МЕНЮ -->
+<div id="msg-context-menu" class="context-menu hidden">
+    <button class="ctx-item" data-action="reply">Ответить</button>
+    <button class="ctx-item" data-action="edit">Редактировать</button>
+    <button class="ctx-item" data-action="pin">Закрепить</button>
+    <button class="ctx-item" data-action="download">Скачать</button>
+    <button class="ctx-item" data-action="delete" style="color: var(--red);">Удалить</button>
+</div>
+
+<div id="chat-context-menu" class="context-menu hidden">
+    <button class="ctx-item" data-action="pin_chat">Закрепить</button>
+    <button class="ctx-item" data-action="block_chat">Заблокировать</button>
+    <button class="ctx-item" data-action="report_chat" style="color: var(--yellow);">Пожаловаться</button>
+    <button class="ctx-item" data-action="delete_chat" style="color: var(--red);">Удалить чат</button>
+</div>
+
+<!-- МОДАЛКА ПРОФИЛЯ -->
+<div id="profile-modal" class="modal hidden">
+    <div class="modal-content" style="text-align: left; max-width: 350px;">
+        <button class="modal-close" id="profile-close">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 15px; margin-bottom: 20px;">
+            <div id="profile-avatar" class="avatar" style="width: 80px; height: 80px; font-size: 30px;"></div>
+            <div id="profile-name" style="font-size: 22px; font-weight: 800;"></div>
+            <div id="profile-username" style="font-size: 14px; color: var(--gray);"></div>
+            <div id="profile-badge" style="margin-top: -5px;"></div>
+        </div>
+        <div style="background: var(--bg); border-radius: 12px; padding: 15px; font-size: 14px; color: var(--gray); text-align: center;">
+            <span id="profile-status">Статус: не в сети</span>
+        </div>
+    </div>
+</div>
+
+<!-- ОКНО НАСТРОЕК -->
+<div id="settings-modal" class="modal hidden">
+    <div class="settings-window">
+        <div class="settings-sidebar">
+            <div class="settings-title">Настройки</div>
+            <button class="settings-nav active" data-section="profile">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg>
+                <span>Профиль</span>
+            </button>
+            <button class="settings-nav" data-section="servers">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="7" rx="2"/><rect x="2" y="14" width="20" height="7" rx="2"/><line x1="6" y1="6.5" x2="6.01" y2="6.5"/><line x1="6" y1="17.5" x2="6.01" y2="17.5"/></svg>
+                <span>Серверы</span>
+            </button>
+            <button class="settings-nav" data-section="about">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                <span>О Flash</span>
+            </button>
+        </div>
+        <div class="settings-content">
+            <button class="modal-close settings-close" id="settings-close"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+
+            <div class="settings-section active" data-section="profile">
+                <h2 class="settings-h2">Профиль</h2>
+                <p class="settings-desc">Информация о твоём аккаунте</p>
+                
+                <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
+                    <div id="settings-avatar-preview" style="width: 70px; height: 70px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: bold; overflow: hidden;">?</div>
+                    <div>
+                        <label for="profile-avatar-input" class="btn-primary" style="padding: 8px 16px; font-size: 13px; cursor: pointer; display: inline-block;">Сменить аватарку</label>
+                        <input type="file" id="profile-avatar-input" accept="image/*" style="display: none;">
+                    </div>
+                </div>
+
+                <div class="settings-field">
+                    <label>Username</label>
+                    <input type="text" id="settings-username" placeholder="username">
+                </div>
+                <div class="settings-field">
+                    <label>Отображаемое имя (ник)</label>
+                    <input type="text" id="settings-display-name" placeholder="Ник">
+                </div>
+                <div id="settings-profile-status" class="auth-status"></div>
+                <button id="settings-profile-save" class="btn-primary">Сохранить</button>
+            </div>
+
+            <div class="settings-section" data-section="servers">
+                <h2 class="settings-h2">Серверы</h2>
+                <p class="settings-desc">Выбери сервер или добавь свой</p>
+                <div id="servers-list" class="servers-list"></div>
+                <button id="add-server-btn" class="btn-primary btn-full" style="margin-top: 16px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                    Добавить сервер
+                </button>
+            </div>
+
+            <div class="settings-section" data-section="about">
+                <h2 class="settings-h2">О Flash</h2>
+                <p class="settings-desc">Открытый мессенджер для всех</p>
+                <div class="about-block">
+                    <p><strong>Flash</strong> — открытый мессенджер. Ты можешь использовать наш официальный сервер, или поднять свой собственный. Весь код открыт: и клиент, и сервер.</p>
+                </div>
+                <h3 class="settings-h3">Поддержка</h3>
+                <div class="contact-list">
+                    <a href="https://t.me/k0rz3t" target="_blank" rel="noopener" class="contact-item">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4 20-7z"/><path d="M22 2 11 13"/></svg>
+                        <div><div class="contact-label">Telegram</div><div class="contact-value">@k0rz3t</div></div>
+                    </a>
+                </div>
+                
+                <h3 class="settings-h3" style="color: #ef4444; margin-top: 30px;">Danger Zone</h3>
+                <div class="about-block" style="border-color: rgba(239, 68, 68, 0.3); margin-bottom: 20px;">
+                    <p>Если приложение работает неправильно или вы хотите сменить сервер, сбросьте все настройки.</p>
+                    <button id="btn-reset-all" class="btn-primary" style="background: #ef4444; margin-top: 10px;">Сбросить базу и выйти</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- МОДАЛКИ -->
+<div id="add-server-modal" class="modal hidden">
+    <div class="modal-content">
+        <button class="modal-close" id="add-server-close"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        <div class="modal-title">Добавить сервер</div>
+        <div class="modal-sub">Введи адрес и пароль сервера</div>
+        <div class="auth-field"><div class="auth-field-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><input id="add-server-address" type="text" placeholder="http://localhost:8080" autocomplete="off" spellcheck="false"></div>
+        <div class="auth-field" style="margin-top: 10px;"><div class="auth-field-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="3"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div><input id="add-server-password" type="password" placeholder="пароль сервера" autocomplete="off"></div>
+        <div id="add-server-status" class="auth-status"></div>
+        <button id="add-server-submit" class="btn-primary btn-full" style="margin-top: 12px;">Проверить и добавить</button>
+    </div>
+</div>
+
+<div id="server-menu-modal" class="modal hidden">
+    <div class="modal-content modal-context">
+        <button class="modal-close" id="server-menu-close"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        <div class="modal-title" id="server-menu-title">Сервер</div>
+        <div id="server-menu-body" class="server-menu-body"></div>
+    </div>
+</div>
+
+<div id="new-chat-modal" class="modal hidden">
+    <div class="modal-content">
+        <button class="modal-close" id="new-chat-close"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        <div class="modal-title">Новый чат</div>
+        <div class="modal-sub">Введи username человека</div>
+        <div class="auth-field"><div class="auth-field-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg></div><input id="new-chat-username" type="text" placeholder="username" autocomplete="off" spellcheck="false"></div>
+        <div id="new-chat-status" class="auth-status"></div>
+        <button id="new-chat-submit" class="btn-primary btn-full" style="margin-top: 12px;">Создать</button>
+    </div>
+</div>
+
+<script src="app.js?v=1027"></script>
+</body>
+</html>
