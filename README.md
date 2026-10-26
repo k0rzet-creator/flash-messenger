@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ FLASH MESSENGER
+# FLASH MESSENGER
 
 **Simple. Fast. Reliable.**
 
