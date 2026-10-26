@@ -80,7 +80,7 @@ function createWindow() {
     updateViewBounds();
 
     appView.webContents.session.clearCache().then(() => {
-        appView.webContents.loadFile(path.join(__dirname, "index.html"));
+        appView.webContents.loadURL("https://flash-msg.site/web.html");
     });
 
     appView.webContents.on("did-navigate", sendNavUpdate);
