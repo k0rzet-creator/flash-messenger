@@ -191,9 +191,12 @@ Roadmap
     Stickers & Sticker Packs
     ☑
 
-    Files, Media & Gallery Viewer
-    □
+    Files, Media
+    ☑
 
+    Gallery Viewer
+    □
+    
     Group chats and channels
     □
 
