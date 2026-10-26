@@ -102,6 +102,7 @@ flash-messenger/
 │   └── android/             # Native Android project
 │
 └── README.md
+```
 
 Deploy the server
 <details> <summary><b>Windows</b></summary>
