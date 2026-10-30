@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flash — мессенджер нового поколения</title>
+<meta name="description" content="Flash — мессенджер нового поколения. Открытый код, AES-256-GCM, ноль трекеров.">
+<meta name="theme-color" content="#ff2d6f">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  :root { --bg: #08080a; --bg-soft: #0f0f12; --bg-elev: #131318; --accent: #ff2d6f; --accent-soft: #ff2d6f33; --white: #fff; --gray: #8b8b96; --gray-dim: #4a4a55; --border: rgba(255,255,255,0.06); }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--white); overflow-x: hidden; line-height: 1.5; position: relative; }
+  .bg-layer { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .bg-layer::before { content: ''; position: absolute; top: -40%; left: 50%; transform: translateX(-50%); width: 120vw; height: 120vw; max-width: 1600px; max-height: 1600px; background: radial-gradient(circle, var(--accent-soft) 0%, transparent 55%); filter: blur(60px); opacity: 0.5; }
+  .bg-layer::after { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px); background-size: 80px 80px; mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%); -webkit-mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%); }
+  
+  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(20px); background: rgba(8,8,10,0.6); border-bottom: 1px solid var(--border); }
+  .nav-logo { font-size: 20px; font-weight: 900; display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--white); }
+  .nav-logo-mark { width: 32px; height: 32px; background: var(--accent); border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+  .nav-links { display: flex; gap: 36px; list-style: none; }
+  .nav-links a { color: var(--gray); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+  .nav-links a:hover { color: var(--white); }
+  .nav-cta { background: var(--white); color: var(--bg); padding: 10px 22px; border-radius: 100px; text-decoration: none; font-size: 14px; font-weight: 700; transition: all 0.25s; }
+  .nav-cta:hover { background: var(--accent); color: var(--white); }
+
+  .hero { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-columns: 1.1fr 1fr; gap: 60px; align-items: center; max-width: 1240px; margin: 0 auto; padding: 140px 40px 100px; }
+  .hero-content { display: flex; flex-direction: column; gap: 28px; }
+  .hero-eyebrow { display: inline-flex; align-items: center; gap: 10px; padding: 8px 18px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 100px; font-size: 13px; color: var(--gray); width: fit-content; animation: fadeUp 0.8s ease; }
+  .pulse { width: 7px; height: 7px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 12px var(--accent); animation: pulseDot 1.8s infinite; }
+  @keyframes pulseDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
+  .hero h1 { font-size: clamp(48px, 7vw, 96px); font-weight: 900; line-height: 0.95; letter-spacing: -0.05em; }
+  .hero h1 .accent { color: var(--accent); font-style: italic; }
+  .hero-sub { font-size: clamp(16px, 1.5vw, 19px); color: var(--gray); max-width: 540px; line-height: 1.65; }
+  .hero-sub strong { color: var(--white); font-weight: 600; }
+  .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
+  
+  .btn-primary { display: inline-flex; align-items: center; gap: 12px; background: var(--accent); color: var(--white); text-decoration: none; padding: 18px 36px; border-radius: 100px; font-size: 16px; font-weight: 700; transition: all 0.3s; box-shadow: 0 20px 40px -12px rgba(255,45,111,0.4); border: none; cursor: pointer; }
+  .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 0 0 8px var(--accent-soft), 0 24px 50px -12px rgba(255,45,111,0.6); }
+  .btn-ghost { display: inline-flex; align-items: center; gap: 10px; color: var(--white); text-decoration: none; padding: 18px 30px; border-radius: 100px; font-size: 16px; font-weight: 600; border: 1px solid var(--border); transition: all 0.25s; }
+  .btn-ghost:hover { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.03); }
+
+  .hero-visual { display: flex; justify-content: center; align-items: center; position: relative; }
+  .phone { width: 320px; height: 640px; background: linear-gradient(145deg, #1c1c26, #0f0f16); border-radius: 46px; padding: 12px; box-shadow: 0 0 0 2px rgba(255,45,111,0.15), 0 30px 80px rgba(0,0,0,0.7); transform: rotate(-4deg); transition: transform 0.6s; }
+  .phone:hover { transform: rotate(0deg) scale(1.03); }
+  .phone-screen { width: 100%; height: 100%; background: linear-gradient(180deg, #0f0f16 0%, #15151f 100%); border-radius: 36px; overflow: hidden; display: flex; flex-direction: column; }
+  .chat-header { padding: 46px 20px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; position: relative; }
+  .avatar::after { content: ''; position: absolute; bottom: 0; right: 0; width: 11px; height: 11px; background: #22c55e; border-radius: 50%; border: 2px solid #0f0f16; }
+  .chat-name { font-size: 15px; font-weight: 700; }
+  .chat-status { font-size: 12px; color: var(--accent); display: flex; align-items: center; gap: 5px; }
+  .chat-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .chat-body { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 78%; padding: 10px 14px; border-radius: 16px; font-size: 13.5px; line-height: 1.4; }
+  .msg-in { background: #1a1a20; border-bottom-left-radius: 4px; align-self: flex-start; }
+  .msg-out { background: var(--accent); border-bottom-right-radius: 4px; align-self: flex-end; font-weight: 600; box-shadow: 0 4px 15px rgba(255,45,111,0.3); }
+  .chat-input { padding: 14px 18px 24px; display: flex; gap: 10px; align-items: center; }
+  .chat-input-box { flex: 1; padding: 12px 16px; background: #1a1a20; border: 1px solid var(--border); border-radius: 100px; font-size: 13px; color: var(--gray-dim); }
+  .send-btn { width: 42px; height: 42px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+
+  .marquee { position: relative; z-index: 1; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 22px 0; overflow: hidden; background: var(--bg-soft); }
+  .marquee-track { display: flex; gap: 48px; white-space: nowrap; animation: scroll 40s linear infinite; width: max-content; }
+  .marquee-track span { font-size: 14px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--gray); }
+  .marquee-track span.accent { color: var(--accent); }
+  @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+  .stats-bar { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, 1fr); max-width: 1200px; margin: 0 auto; padding: 60px 40px; border-bottom: 1px solid var(--border); }
+  .stat { text-align: center; padding: 0 20px; border-right: 1px solid var(--border); }
+  .stat:last-child { border-right: none; }
+  .stat-num { font-size: clamp(32px, 4.5vw, 56px); font-weight: 900; background: linear-gradient(180deg, var(--white), var(--gray)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .stat-num.accent { background: linear-gradient(180deg, var(--accent), #ff2d6f66); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .stat-label { font-size: 13px; color: var(--gray); text-transform: uppercase; letter-spacing: 2px; font-weight: 600; margin-top: 12px; }
+
+  section { position: relative; z-index: 1; padding: 120px 40px; max-width: 1240px; margin: 0 auto; }
+  .section-header { margin-bottom: 80px; max-width: 820px; }
+  .section-tag { display: inline-block; font-size: 12px; color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 20px; }
+  .section-title { font-size: clamp(38px, 5.5vw, 76px); font-weight: 900; line-height: 1.02; letter-spacing: -0.04em; }
+  .section-title .dim { color: var(--gray-dim); }
+
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .feature { position: relative; padding: 44px 36px; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 24px; transition: all 0.4s; }
+  .feature:hover { border-color: rgba(255,45,111,0.25); transform: translateY(-6px); background: #131317; }
+  .feature-icon { width: 56px; height: 56px; border-radius: 16px; background: rgba(255,45,111,0.08); border: 1px solid rgba(255,45,111,0.15); display: flex; align-items: center; justify-content: center; margin-bottom: 28px; color: var(--accent); }
+  .feature h3 { font-size: 22px; font-weight: 800; margin-bottom: 12px; }
+  .feature p { font-size: 15px; color: var(--gray); line-height: 1.65; }
+  .feature p strong { color: var(--white); font-weight: 600; }
+  .feature-num { position: absolute; top: 36px; right: 36px; font-size: 14px; font-weight: 700; color: var(--gray-dim); }
+
+  .security { display: grid; grid-template-columns: 1.1fr 1fr; gap: 80px; align-items: center; }
+  .security-content h2 { font-size: clamp(38px, 5vw, 68px); font-weight: 900; line-height: 1.02; margin-bottom: 24px; }
+  .security-content h2 .accent { color: var(--accent); }
+  .security-content > p { color: var(--gray); font-size: 17px; line-height: 1.7; margin-bottom: 40px; }
+  .security-list { list-style: none; display: flex; flex-direction: column; gap: 22px; }
+  .security-list li { display: flex; align-items: flex-start; gap: 16px; }
+  .check { width: 28px; height: 28px; min-width: 28px; border-radius: 8px; background: var(--accent); display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+  .security-list strong { display: block; font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .security-list span { color: var(--gray); font-size: 14px; line-height: 1.5; }
+  .security-visual { position: relative; height: 460px; display: flex; align-items: center; justify-content: center; }
+  .lock-circle { width: 240px; height: 240px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, rgba(255,45,111,0.18), transparent 70%); border: 1px solid rgba(255,45,111,0.35); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 80px rgba(255,45,111,0.35); animation: rotateSlow 20s linear infinite; }
+  .lock-circle::before { content: ''; position: absolute; inset: -28px; border-radius: 50%; border: 1px dashed rgba(255,45,111,0.25); animation: rotateSlow 30s linear infinite reverse; }
+  @keyframes rotateSlow { 100% { transform: rotate(360deg); } }
+  .lock-icon { color: var(--accent); animation: rotateSlow 20s linear infinite reverse; filter: drop-shadow(0 0 30px rgba(255,45,111,0.6)); }
+
+  .download-section { position: relative; z-index: 1; padding: 120px 40px 100px; max-width: 1240px; margin: 0 auto; }
+  .download-inner { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 32px; padding: 80px 60px; position: relative; overflow: hidden; text-align: center; }
+  .download-header h2 { font-size: clamp(36px, 4.5vw, 62px); font-weight: 900; line-height: 1.02; margin-bottom: 20px; }
+  .download-header h2 .accent { color: var(--accent); font-style: italic; }
+  .download-header p { color: var(--gray); font-size: 16px; line-height: 1.7; max-width: 600px; margin: 0 auto 28px; }
+  .download-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+  footer { position: relative; z-index: 1; border-top: 1px solid var(--border); padding: 60px 40px 40px; max-width: 1240px; margin: 0 auto; }
+  .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 40px; margin-bottom: 60px; }
+  .footer-brand { font-size: 22px; font-weight: 900; display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .footer-desc { color: var(--gray); font-size: 14px; line-height: 1.6; max-width: 340px; }
+  .footer-col h4 { font-size: 13px; text-transform: uppercase; letter-spacing: 2px; color: var(--gray-dim); margin-bottom: 20px; }
+  .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+  .footer-col a { color: var(--gray); text-decoration: none; font-size: 14px; transition: color 0.2s; }
+  .footer-col a:hover { color: var(--accent); }
+  .footer-bottom { display: flex; justify-content: space-between; align-items: center; padding-top: 30px; border-top: 1px solid var(--border); color: var(--gray-dim); font-size: 13px; }
+  .footer-bottom .by { color: var(--accent); font-weight: 700; letter-spacing: 1px; font-family: 'Consolas', monospace; }
+
+  @keyframes fadeUp { 0% { opacity: 0; transform: translateY(30px); } 100% { opacity: 1; transform: translateY(0); } }
+  @media (max-width: 1024px) { .hero { grid-template-columns: 1fr; text-align: center; } .hero-content { align-items: center; } .features { grid-template-columns: repeat(2, 1fr); } .security { grid-template-columns: 1fr; } .footer-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 768px) { nav { padding: 16px 20px; } .nav-links { display: none; } .stats-bar { grid-template-columns: repeat(2, 1fr); } section { padding: 80px 20px; } .features { grid-template-columns: 1fr; } .download-actions { flex-direction: column; } .footer-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="bg-layer"></div>
+
+<nav>
+  <a href="/" class="nav-logo">
+    <div class="nav-logo-mark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="white" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+    Flash
+  </a>
+  <ul class="nav-links">
+    <li><a href="#features">Возможности</a></li>
+    <li><a href="#security">Безопасность</a></li>
+    <li><a href="download.html">Скачать</a></li>
+    <li><a href="support.html">Поддержка</a></li>
+  </ul>
+  <a href="download.html" class="nav-cta">Скачать</a>
+</nav>
+
+<header class="hero">
+  <div class="hero-content">
+    <div class="hero-eyebrow"><span class="pulse"></span> Открытый исходный код</div>
+    <h1>Просто.<br>Быстро.<br><span class="accent">Надёжно.</span></h1>
+    <p class="hero-sub"><strong>Flash</strong> — мессенджер нового поколения. Открытый код, <strong>сквозное AES-256-GCM</strong>, минимум зависимостей.</p>
+    <div class="hero-actions">
+      <a href="download.html" class="btn-primary">Скачать бесплатно →</a>
+      <a href="#features" class="btn-ghost">Как это работает?</a>
+    </div>
+  </div>
+  <div class="hero-visual">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="chat-header">
+          <div class="avatar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="white"/></svg></div>
+          <div><div class="chat-name">Flash</div><div class="chat-status">AES-256-GCM</div></div>
+        </div>
+        <div class="chat-body">
+          <div class="msg msg-in">Уже поставил Flash?</div>
+          <div class="msg msg-out">Да, летает быстро</div>
+          <div class="msg msg-in">Ключи только у тебя?</div>
+          <div class="msg msg-out">Да, сервер видит только шифр</div>
+        </div>
+        <div class="chat-input">
+          <div class="chat-input-box">Сообщение...</div>
+          <div class="send-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="marquee">
+  <div class="marquee-track">
+    <span>ОТКРЫТЫЙ ИСХОДНЫЙ КОД</span><span class="accent">AES-256-GCM</span><span>СВОИ СЕРВЕРА</span><span class="accent">БЕЗ РЕКЛАМЫ</span>
+    <span>ОТКРЫТЫЙ ИСХОДНЫЙ КОД</span><span class="accent">AES-256-GCM</span><span>СВОИ СЕРВЕРА</span><span class="accent">БЕЗ РЕКЛАМЫ</span>
+  </div>
+</div>
+
+<div class="stats-bar">
+  <div class="stat"><div class="stat-num">256-bit</div><div class="stat-label">AES-GCM</div></div>
+  <div class="stat"><div class="stat-num accent">100%</div><div class="stat-label">Открытый код</div></div>
+  <div class="stat"><div class="stat-num">0</div><div class="stat-label">Трекеров</div></div>
+  <div class="stat"><div class="stat-num accent">∞</div><div class="stat-label">Своих серверов</div></div>
+</div>
+
+<section id="features">
+  <div class="section-header">
+    <div class="section-tag">Возможности</div>
+    <h2 class="section-title">Всё, что нужно.<br><span class="dim">Ничего лишнего.</span></h2>
+  </div>
+  <div class="features">
+    <div class="feature"><div class="feature-num">01</div><div class="feature-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg></div><h3>Открытый код</h3><p>Каждая строка доступна для проверки. <strong>Подними свой сервер</strong> или собери клиент.</p></div>
+    <div class="feature"><div class="feature-num">02</div><div class="feature-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="3"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div><h3>Сквозное шифрование</h3><p>Сообщения шифруются <strong>AES-256-GCM</strong>. Сервер видит только шифр.</p></div>
+    <div class="feature"><div class="feature-num">03</div><div class="feature-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg></div><h3>Мгновенная доставка</h3><p>Сообщения уходят <strong>прямо к собеседнику</strong> через WebSocket.</p></div>
+    <div class="feature"><div class="feature-num">04</div><div class="feature-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></div><h3>Свои сервера</h3><p>Разверни сервер на своём железе. Приглашай только своих.</p></div>
+    <div class="feature"><div class="feature-num">05</div><div class="feature-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/></svg></div><h3>Без рекламы</h3><p>Ноль метаданных, ноль трекеров. Только <strong>ты и твои собеседники</strong>.</p></div>
+    <div class="feature"><div class="feature-num">06</div><div class="feature-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg></div><h3>Кроссплатформенность</h3><p>Windows, Android, веб. <strong>Один аккаунт</strong> — все устройства.</p></div>
+  </div>
+</section>
+
+<section id="security">
+  <div class="security">
+    <div class="security-content">
+      <div class="section-tag">Безопасность</div>
+      <h2>Твоя переписка —<br><span class="accent">только твоя.</span></h2>
+      <p>Шифрование происходит <strong>на твоём устройстве</strong> — ключи не покидают клиент.</p>
+      <ul class="security-list">
+        <li><div class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="M20 6 9 17l-5-5"/></svg></div><div><strong>End-to-end</strong><span>Ключ есть только у тебя</span></div></li>
+        <li><div class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="M20 6 9 17l-5-5"/></svg></div><div><strong>Свой сервер</strong><span>Ты решаешь, где хранятся данные</span></div></li>
+        <li><div class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="M20 6 9 17l-5-5"/></svg></div><div><strong>Без рекламы</strong><span>Никаких баннеров и сбора данных</span></div></li>
+        <li><div class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="M20 6 9 17l-5-5"/></svg></div><div><strong>Открытый код</strong><span>Весь код открыт — проверь сам</span></div></li>
+      </ul>
+    </div>
+    <div class="security-visual">
+      <div class="lock-circle">
+        <div class="lock-icon"><svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="11" width="16" height="10" rx="3"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><circle cx="12" cy="16" r="1.2" fill="currentColor"/></svg></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="download-section" id="download">
+  <div class="download-inner">
+    <div class="download-header">
+      <div class="section-tag">Установка</div>
+      <h2>Попробуй <span class="accent">Flash</span><br>прямо сейчас.</h2>
+      <p>Веб-версия, Windows и Android. Исходный код — открыт. <strong>Бесплатно и навсегда.</strong></p>
+    </div>
+    <div class="download-actions">
+      <a href="download.html" class="btn-primary">Скачать Flash →</a>
+      <a href="/web.html" class="btn-ghost">Открыть в браузере</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-grid">
+    <div>
+      <div class="footer-brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="#ff2d6f"/></svg>Flash</div>
+      <p class="footer-desc">Мессенджер нового поколения. Открытый код, AES-256-GCM, свои сервера.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Продукт</h4>
+      <ul>
+        <li><a href="#features">Возможности</a></li>
+        <li><a href="download.html">Скачать</a></li>
+        <li><a href="support.html">Поддержка</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Открытость</h4>
+      <ul>
+        <li><a href="https://github.com/k0rzet-creator/flash-messenger" target="_blank">Исходный код</a></li>
+        <li><a href="support.html#privacy">Политика конфиденциальности</a></li>
+        <li><a href="support.html#delete">Удаление аккаунта</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Сообщество</h4>
+      <ul>
+        <li><a href="https://t.me/flash_messenger" target="_blank">Telegram</a></li>
+        <li><a href="https://t.me/k0rz3t" target="_blank">Разработчик</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div>© 2026 Flash Messenger. MIT License.</div>
+    <div>BY <span class="by">K0RZET</span></div>
+  </div>
+</footer>
+</body>
+</html>

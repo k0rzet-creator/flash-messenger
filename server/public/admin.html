@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Flash — Админка</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { background: #08080a; color: #fff; padding: 40px; }
+  h1 { color: #ff2d6f; margin-bottom: 20px; font-size: 28px; }
+
+  .tabs { display: flex; gap: 10px; margin-bottom: 30px; border-bottom: 1px solid #333; padding-bottom: 10px; overflow-x: auto; }
+  .tab-btn { background: transparent; border: none; color: #8b8b96; font-size: 15px; cursor: pointer; padding: 10px 20px; border-radius: 8px; transition: 0.2s; font-weight: 600; white-space: nowrap; }
+  .tab-btn:hover { color: #fff; background: #16161c; }
+  .tab-btn.active { color: #fff; background: #ff2d6f; }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 40px; }
+  .stat-card { background: #16161c; border: 1px solid #333; padding: 30px; border-radius: 16px; text-align: center; }
+  .stat-value { font-size: 48px; font-weight: 900; color: #ff2d6f; line-height: 1; margin-bottom: 10px; }
+  .stat-label { font-size: 14px; color: #8b8b96; text-transform: uppercase; letter-spacing: 1px; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  th, td { padding: 14px; text-align: left; border-bottom: 1px solid #333; }
+  th { color: #8b8b96; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+  tr:hover { background: #111; }
+
+  button { background: #ff2d6f; color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; margin-right: 4px; }
+  button:hover { opacity: 0.8; }
+  button.danger { background: #ef4444; }
+  button.success { background: #22c55e; }
+  button.ghost { background: #333; }
+
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; margin-left: 4px; }
+  .badge.banned { background: #ef4444; }
+  .badge.admin { background: #ff2d6f; }
+  .badge.custom { background: #a78bfa; }
+
+  #login-form { max-width: 300px; margin: 100px auto; text-align: center; }
+  input { width: 100%; padding: 14px; margin-bottom: 12px; background: #16161c; border: 1px solid #333; color: #fff; border-radius: 8px; font-size: 16px; }
+  input:focus { outline: none; border-color: #ff2d6f; }
+
+  .tech-box { background: #16161c; border: 1px solid #333; padding: 20px; border-radius: 12px; margin-bottom: 20px; font-family: monospace; }
+  .tech-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
+  .tech-row span:first-child { color: #8b8b96; }
+
+  .broadcast-box { display: flex; gap: 10px; margin-bottom: 20px; }
+  .broadcast-box input { flex: 1; margin-bottom: 0; }
+</style>
+</head>
+<body>
+
+<div id="login-form">
+    <h1>Вход в админку</h1>
+    <input type="text" id="username" placeholder="Username" autocomplete="off">
+    <input type="password" id="password" placeholder="Пароль" autocomplete="off">
+    <button onclick="login()" style="width:100%; padding: 14px; font-size: 16px;">Войти</button>
+    <div id="login-status" style="color: #ff2d6f; margin-top: 10px;"></div>
+</div>
+
+<div id="admin-panel" style="display: none;">
+    <h1>Управление сервером</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('stats', this)">Статистика</button>
+        <button class="tab-btn" onclick="switchTab('users', this)">Пользователи</button>
+        <button class="tab-btn" onclick="switchTab('tech', this)">Тех. Инфа</button>
+        <button class="tab-btn" onclick="switchTab('broadcast', this)">Рассылка</button>
+    </div>
+
+    <!-- СТАТИСТИКА -->
+    <div id="tab-stats" class="tab-content active">
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-value" id="stat-users">0</div><div class="stat-label">Юзеров</div></div>
+            <div class="stat-card"><div class="stat-value" id="stat-chats">0</div><div class="stat-label">Чатов</div></div>
+            <div class="stat-card"><div class="stat-value" id="stat-messages">0</div><div class="stat-label">Сообщений</div></div>
+            <div class="stat-card"><div class="stat-value" id="stat-online">0</div><div class="stat-label">Онлайн</div></div>
+        </div>
+    </div>
+
+    <!-- ПОЛЬЗОВАТЕЛИ -->
+    <div id="tab-users" class="tab-content">
+        <table>
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Ник</th>
+                    <th>Дата</th>
+                    <th>Статус</th>
+                    <th>Бейдж</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody id="users-list"></tbody>
+        </table>
+    </div>
+
+    <!-- ТЕХ. ИНФА -->
+    <div id="tab-tech" class="tab-content">
+        <div class="tech-box" id="tech-info">
+            Загрузка...
+        </div>
+        <h3>Последние сообщения (в зашифрованном виде)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>От кого</th>
+                    <th>Шифр (base64)</th>
+                </tr>
+            </thead>
+            <tbody id="logs-list"></tbody>
+        </table>
+    </div>
+
+    <!-- РАССЫЛКА -->
+    <div id="tab-broadcast" class="tab-content">
+        <h3>Отправить системное сообщение всем</h3>
+        <p style="color:#8b8b96; margin-bottom: 20px; font-size: 14px;">Сообщение придет всем, кто сейчас в сети. Отправитель будет "System".</p>
+        <div class="broadcast-box">
+            <input type="text" id="broadcast-text" placeholder="Введите текст сообщения...">
+            <button onclick="sendBroadcast()">Отправить</button>
+        </div>
+        <div id="broadcast-status" style="color: #22c55e;"></div>
+    </div>
+</div>
+
+<script>
+    // Токен хранится ТОЛЬКО в памяти — ни localStorage, ни sessionStorage, ни cookie.
+    // При перезагрузке страницы придётся логиниться заново.
+    let token = null;
+    let currentServer = window.location.origin;
+
+    function switchTab(tabName, btn) {
+        document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+        document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
+
+        document.getElementById("tab-" + tabName).classList.add("active");
+        if (btn) btn.classList.add("active");
+
+        if (tabName === "stats") loadStats();
+        if (tabName === "users") loadUsers();
+        if (tabName === "tech") loadTech();
+        if (tabName === "broadcast") document.getElementById("broadcast-status").textContent = "";
+    }
+
+    async function login() {
+        const username = document.getElementById("username").value;
+        const password = document.getElementById("password").value;
+        const status = document.getElementById("login-status");
+
+        if (!username || !password) { status.textContent = "Заполни все поля"; return; }
+
+        try {
+            const res = await fetch(currentServer + "/api/connect", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: "" })
+            });
+            const conn = await res.json();
+
+            const loginRes = await fetch(currentServer + "/api/login", {
+                method: "POST", headers: { "Content-Type": "application/json", "X-Connect-Token": conn.connect_token },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await loginRes.json();
+            if (data.error) {
+                status.textContent = data.error === "user_banned" ? "Ты забанен" : "Неверный логин или пароль";
+                return;
+            }
+
+            const check = await fetch(currentServer + "/api/admin/check", {
+                headers: { "Authorization": "Bearer " + data.token }
+            });
+            const admin = await check.json();
+            if (!admin.is_admin) { status.textContent = "Ты не админ!"; return; }
+
+            // Сохраняем токен только в памяти. Ничего не пишем на диск.
+            token = data.token;
+            document.getElementById("password").value = "";
+            document.getElementById("login-form").style.display = "none";
+            document.getElementById("admin-panel").style.display = "block";
+            loadStats();
+        } catch (e) { status.textContent = "Ошибка подключения"; }
+    }
+
+    // При выгрузке/закрытии страницы затираем токен из памяти (best effort)
+    window.addEventListener("pagehide", () => { token = null; });
+    window.addEventListener("beforeunload", () => { token = null; });
+
+    async function loadStats() {
+        try {
+            const res = await fetch(currentServer + "/api/admin/stats", {
+                headers: { "Authorization": "Bearer " + token }
+            });
+            const data = await res.json();
+            document.getElementById("stat-users").textContent = data.users;
+            document.getElementById("stat-chats").textContent = data.chats;
+            document.getElementById("stat-messages").textContent = data.messages;
+            document.getElementById("stat-online").textContent = data.online;
+        } catch (e) {}
+    }
+
+    async function loadUsers() {
+        try {
+            const res = await fetch(currentServer + "/api/admin/users", {
+                headers: { "Authorization": "Bearer " + token }
+            });
+            const users = await res.json();
+            const tbody = document.getElementById("users-list");
+            tbody.innerHTML = "";
+            users.forEach(u => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>@${u.username}</td>
+                    <td>${u.display_name}</td>
+                    <td>${new Date(u.created_at).toLocaleDateString()}</td>
+                    <td>
+                        ${u.is_banned ? '<span class="badge banned">Бан</span>' : ''}
+                        ${u.is_admin ? '<span class="badge admin">Админ</span>' : ''}
+                    </td>
+                    <td>
+                        ${u.badge ? `<span class="badge custom">${u.badge}</span>` : '—'}
+                        <button onclick="setBadge('${u.id}')" class="ghost" style="font-size:11px; padding:4px 8px; margin-left:5px;">✎</button>
+                    </td>
+                    <td>
+                        <button onclick="toggleBan('${u.id}', ${u.is_banned})" class="${u.is_banned ? 'success' : 'danger'}">${u.is_banned ? 'Разбанить' : 'Забанить'}</button>
+                        <button onclick="togglePromote('${u.id}', ${u.is_admin})" class="ghost">${u.is_admin ? 'Снять админа' : 'Дать админку'}</button>
+                        <button onclick="deleteUser('${u.id}')" class="danger">Удалить</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) { alert("Ошибка загрузки юзеров"); }
+    }
+
+    async function loadTech() {
+        try {
+            const res = await fetch(currentServer + "/api/admin/tech", {
+                headers: { "Authorization": "Bearer " + token }
+            });
+            const data = await res.json();
+            const box = document.getElementById("tech-info");
+            box.innerHTML = `
+                <div class="tech-row"><span>Uptime</span><span>${Math.floor(data.uptime / 60)} мин</span></div>
+                <div class="tech-row"><span>Память (RSS)</span><span>${data.memory_rss}</span></div>
+                <div class="tech-row"><span>Node.js</span><span>${data.node_version}</span></div>
+                <div class="tech-row"><span>Платформа</span><span>${data.platform}</span></div>
+            `;
+
+            const logsRes = await fetch(currentServer + "/api/admin/logs", {
+                headers: { "Authorization": "Bearer " + token }
+            });
+            const logs = await logsRes.json();
+            const tbody = document.getElementById("logs-list");
+            tbody.innerHTML = "";
+            logs.forEach(l => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>${new Date(l.created_at).toLocaleString()}</td>
+                    <td>@${l.sender_name}</td>
+                    <td style="color:#4a4a55; font-size:11px;">${l.content_encrypted.slice(0, 30)}...</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) { alert("Ошибка загрузки тех. инфы"); }
+    }
+
+    async function sendBroadcast() {
+        const text = document.getElementById("broadcast-text").value;
+        if (!text) return;
+        const status = document.getElementById("broadcast-status");
+
+        try {
+            const res = await fetch(currentServer + "/api/admin/broadcast", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                body: JSON.stringify({ text })
+            });
+            if (res.ok) {
+                status.textContent = "Отправлено!";
+                document.getElementById("broadcast-text").value = "";
+                setTimeout(() => status.textContent = "", 3000);
+            } else {
+                status.textContent = "Ошибка отправки";
+            }
+        } catch (e) { status.textContent = "Ошибка соединения"; }
+    }
+
+    async function setBadge(id) {
+        const badge = prompt("Введите текст бейджа (или оставьте пустым, чтобы убрать):");
+        if (badge === null) return;
+        await fetch(currentServer + "/api/admin/badge", {
+            method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+            body: JSON.stringify({ user_id: id, badge: badge.trim() })
+        });
+        loadUsers();
+    }
+
+    async function toggleBan(id, currentBan) {
+        await fetch(currentServer + "/api/admin/ban", {
+            method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+            body: JSON.stringify({ user_id: id, ban: !currentBan })
+        });
+        loadUsers();
+    }
+
+    async function togglePromote(id, currentAdmin) {
+        await fetch(currentServer + "/api/admin/promote", {
+            method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+            body: JSON.stringify({ user_id: id, promote: !currentAdmin })
+        });
+        loadUsers();
+    }
+
+    async function deleteUser(id) {
+        if (!confirm("Удалить юзера навсегда?")) return;
+        await fetch(currentServer + "/api/admin/delete", {
+            method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+            body: JSON.stringify({ user_id: id })
+        });
+        loadUsers();
+    }
+
+    // Никакого автовхода при загрузке — всегда показываем форму логина.
+</script>
+</body>
+</html>
