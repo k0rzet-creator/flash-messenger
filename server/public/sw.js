@@ -1,4 +1,4 @@
-const CACHE_NAME = "flash-v1";
+const CACHE_NAME = "flash-v2";
 
 const ASSETS = [
     "/",
@@ -40,6 +40,11 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
     if (event.request.method !== "GET") return;
     if (!event.request.url.startsWith("http")) return;
+    // НЕ кэшируем API
+    try {
+        const url = new URL(event.request.url);
+        if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/uploads/")) return;
+    } catch (e) { return; }
 
     event.respondWith(
         fetch(event.request)

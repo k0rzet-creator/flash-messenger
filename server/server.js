@@ -45,8 +45,26 @@ const CONFIG = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
 const PORT = CONFIG.port || 8080;
 const SERVER_PASSWORD = CONFIG.password || "";
 const REGISTRATION_OPEN = CONFIG.registration_open !== false;
-const JWT_SECRET = CONFIG.jwt_secret || crypto.randomBytes(32).toString("hex");
-const CONNECT_SECRET = CONFIG.connect_secret || crypto.randomBytes(32).toString("hex");
+
+// Защита от дефолтных секретов-заглушек
+const BAD_SECRET_RE = /впиши|сюда|example|change.?me|placeholder/i;
+function ensureSecret(name, current) {
+    if (current && current.length >= 32 && !BAD_SECRET_RE.test(current)) {
+        return current;
+    }
+    const generated = crypto.randomBytes(32).toString("hex");
+    CONFIG[name] = generated;
+    try {
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(CONFIG, null, 4));
+        logWarn(`⚠ Секрет "${name}" не настроен или слабый. Сгенерирован новый и записан в server.json.`);
+    } catch (e) {
+        logError(`Не удалось записать ${name} в server.json: ${e.message}`);
+    }
+    return generated;
+}
+const JWT_SECRET = ensureSecret("jwt_secret", CONFIG.jwt_secret);
+const CONNECT_SECRET = ensureSecret("connect_secret", CONFIG.connect_secret);
+// encryption_key у сервера не нужен: шифрование на клиенте.
 
 const DATA_DIR = path.join(__dirname, "data");
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -133,9 +151,39 @@ const storage = multer.diskStorage({
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
 // ============================================
+// RATE LIMITING (in-memory)
+// ============================================
+const rateBuckets = new Map();
+function rateLimit(key, max, windowMs) {
+    const now = Date.now();
+    let entry = rateBuckets.get(key);
+    if (!entry || now > entry.reset) {
+        entry = { count: 0, reset: now + windowMs };
+        rateBuckets.set(key, entry);
+    }
+    entry.count++;
+    return entry.count > max;
+}
+setInterval(() => {
+    const now = Date.now();
+    for (const [k, v] of rateBuckets) if (now > v.reset) rateBuckets.delete(k);
+}, 300000);
+
+function rateLimitMiddleware(name, max, windowMs) {
+    return (req, res, next) => {
+        const ip = req.ip || req.connection?.remoteAddress || "unknown";
+        if (rateLimit(`${name}:${ip}`, max, windowMs)) {
+            return res.status(429).json({ error: "rate_limited" });
+        }
+        next();
+    };
+}
+
+// ============================================
 // EXPRESS
 // ============================================
 const app = express();
+app.set("trust proxy", 1);
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use((req, res, next) => {
@@ -148,7 +196,8 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(express.static(__dirname));
+// ВАЖНО: НЕ отдаём весь корень проекта (иначе утекут server.json, firebase-service-account.json, data/flash.db, package.json, server.js).
+// Только public/ и uploads/.
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(UPLOADS_DIR));
 
@@ -158,6 +207,11 @@ app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.ht
 function uuid() { return crypto.randomUUID(); }
 function getUserById(id) { return db.prepare("SELECT id, username, display_name, avatar_url, bio, created_at, last_seen, is_banned, is_admin, badge FROM users WHERE id = ?").get(id); }
 function getUserByUsername(u) { return db.prepare("SELECT * FROM users WHERE username = ?").get(u.toLowerCase()); }
+
+// Утилита очистки строковых полей (trim + ограничение длины)
+function cleanString(s, maxLen = 200) {
+    return String(s == null ? "" : s).trim().slice(0, maxLen);
+}
 
 // ============================================
 // МИДЛВАРЫ
@@ -188,52 +242,68 @@ function adminAuth(req, res, next) {
 // API АВТОРИЗАЦИИ
 // ============================================
 app.get("/api/server-info", (req, res) => res.json({ name: CONFIG.server_name || "Flash", password_required: SERVER_PASSWORD.length > 0, registration_open: REGISTRATION_OPEN }));
-app.post("/api/connect", (req, res) => {
+
+app.post("/api/connect", rateLimitMiddleware("connect", 30, 60000), (req, res) => {
     if (SERVER_PASSWORD.length > 0 && (req.body || {}).password !== SERVER_PASSWORD) return res.status(401).json({ error: "invalid_server_password" });
     res.json({ connect_token: jwt.sign({ type: "connect" }, CONNECT_SECRET, { expiresIn: "30d" }) });
 });
-app.post("/api/register", connAuth, async (req, res) => {
+
+app.post("/api/register", rateLimitMiddleware("register", 5, 60000), connAuth, async (req, res) => {
     if (!REGISTRATION_OPEN) return res.status(403).json({ error: "registration_closed" });
-    const { username, password, display_name } = req.body || {};
+    const username = cleanString(req.body.username, 32);
+    const password = String(req.body.password || "");
+    const displayName = cleanString(req.body.display_name, 50);
     if (!username || !password) return res.status(400).json({ error: "missing_fields" });
+    if (password.length < 6) return res.status(400).json({ error: "password_too_short" });
     const clean = username.toLowerCase().replace(/[^a-z0-9_]/g, "");
     if (clean.length < 3) return res.status(400).json({ error: "username_too_short" });
     if (getUserByUsername(clean)) return res.status(400).json({ error: "username_taken" });
     const id = uuid(); const hash = await bcrypt.hash(password, 10); const now = Date.now();
     const isFirst = db.prepare("SELECT COUNT(*) as count FROM users").get().count === 0;
     db.prepare(`INSERT INTO users (id, username, display_name, password_hash, created_at, last_seen, is_admin) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .run(id, clean, display_name || clean, hash, now, now, isFirst ? 1 : 0);
+      .run(id, clean, displayName || clean, hash, now, now, isFirst ? 1 : 0);
     logSuccess(`Новый пользователь: @${clean}`);
     res.json({ token: jwt.sign({ userId: id }, JWT_SECRET, { expiresIn: "365d" }), user: getUserById(id) });
 });
-app.post("/api/login", connAuth, async (req, res) => {
-    const { username, password } = req.body || {};
+
+app.post("/api/login", rateLimitMiddleware("login", 10, 60000), connAuth, async (req, res) => {
+    const username = cleanString(req.body.username, 32).toLowerCase();
+    const password = String(req.body.password || "");
     const user = getUserByUsername(username);
     if (!user || !(await bcrypt.compare(password, user.password_hash))) return res.status(401).json({ error: "invalid_credentials" });
     if (user.is_banned) return res.status(403).json({ error: "user_banned" });
     db.prepare("UPDATE users SET last_seen = ? WHERE id = ?").run(Date.now(), user.id);
     res.json({ token: jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "365d" }), user: getUserById(user.id) });
 });
+
 app.get("/api/me", auth, (req, res) => {
     const user = getUserById(req.userId);
     if (!user) return res.status(404).json({ error: "not_found" });
     if (user.is_banned) return res.status(403).json({ error: "user_banned" });
     res.json(user);
 });
+
 app.post("/api/profile", auth, (req, res) => {
     try {
-        const { username, display_name, bio } = req.body || {};
+        const username = cleanString(req.body.username, 32);
+        const displayName = cleanString(req.body.display_name, 50);
+        const bio = cleanString(req.body.bio, 200);
         if (!username) return res.status(400).json({ error: "missing_username" });
         const clean = username.toLowerCase().replace(/[^a-z0-9_]/g, "");
         if (clean.length < 3) return res.status(400).json({ error: "username_too_short" });
         const existing = db.prepare("SELECT id FROM users WHERE username = ? AND id != ?").get(clean, req.userId);
         if (existing) return res.status(400).json({ error: "username_taken" });
-        db.prepare("UPDATE users SET username = ?, display_name = ?, bio = ? WHERE id = ?").run(clean, display_name || clean, bio || "", req.userId);
+        db.prepare("UPDATE users SET username = ?, display_name = ?, bio = ? WHERE id = ?").run(clean, displayName || clean, bio, req.userId);
         res.json({ user: getUserById(req.userId) });
     } catch (e) { res.status(500).json({ error: "server_error" }); }
 });
+
 app.post("/api/profile/avatar", auth, upload.single("avatar"), (req, res) => {
     if (!req.file) return res.status(400).json({ error: "no_file" });
+    if (!req.file.mimetype || !req.file.mimetype.startsWith("image/")) {
+        try { fs.unlinkSync(req.file.path); } catch (e) {}
+        return res.status(400).json({ error: "invalid_type" });
+    }
     const user = getUserById(req.userId);
     if (user.avatar_url) {
         const oldPath = path.join(UPLOADS_DIR, path.basename(user.avatar_url));
@@ -243,6 +313,7 @@ app.post("/api/profile/avatar", auth, upload.single("avatar"), (req, res) => {
     db.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").run(avatarUrl, req.userId);
     res.json({ avatar_url: avatarUrl });
 });
+
 app.get("/api/users/:username", auth, (req, res) => {
     const user = getUserByUsername(req.params.username);
     if (!user) return res.status(404).json({ error: "not_found" });
@@ -270,64 +341,90 @@ app.get("/api/chats", auth, (req, res) => {
         res.json(enriched);
     } catch (e) { logError(`Ошибка в /api/chats: ${e.message}`); res.status(500).json({ error: "server_error" }); }
 });
+
 app.post("/api/chats/direct", auth, (req, res) => {
-    const { other_user_id } = req.body || {};
-    const existing = db.prepare(`SELECT c.id FROM chats c JOIN chat_members m1 ON m1.chat_id = c.id AND m1.user_id = ? JOIN chat_members m2 ON m2.chat_id = c.id AND m2.user_id = ? WHERE c.type = 'direct' LIMIT 1`).get(req.userId, other_user_id);
+    const otherUserId = cleanString(req.body.other_user_id, 64);
+    if (!otherUserId) return res.status(400).json({ error: "missing_user" });
+    if (otherUserId === req.userId) return res.status(400).json({ error: "self_chat" });
+    const otherUser = db.prepare("SELECT id FROM users WHERE id = ?").get(otherUserId);
+    if (!otherUser) return res.status(404).json({ error: "user_not_found" });
+    const existing = db.prepare(`SELECT c.id FROM chats c JOIN chat_members m1 ON m1.chat_id = c.id AND m1.user_id = ? JOIN chat_members m2 ON m2.chat_id = c.id AND m2.user_id = ? WHERE c.type = 'direct' LIMIT 1`).get(req.userId, otherUserId);
     if (existing) return res.json({ chat_id: existing.id });
     const chatId = uuid(); const now = Date.now();
     db.transaction(() => {
         db.prepare("INSERT INTO chats (id, type, created_by, created_at) VALUES (?, 'direct', ?, ?)").run(chatId, req.userId, now);
         db.prepare("INSERT INTO chat_members (chat_id, user_id, joined_at, role) VALUES (?, ?, ?, 'member')").run(chatId, req.userId, now);
-        db.prepare("INSERT INTO chat_members (chat_id, user_id, joined_at, role) VALUES (?, ?, ?, 'member')").run(chatId, other_user_id, now);
+        db.prepare("INSERT INTO chat_members (chat_id, user_id, joined_at, role) VALUES (?, ?, ?, 'member')").run(chatId, otherUserId, now);
     })();
     res.json({ chat_id: chatId });
 });
+
 app.post("/api/chats/group", auth, (req, res) => {
-    const { name, type } = req.body || {};
+    const name = cleanString(req.body.name, 100);
     if (!name) return res.status(400).json({ error: "missing_name" });
+    // Разрешаем только group и channel (не direct — direct создаётся через /api/chats/direct)
+    const type = req.body.type === "channel" ? "channel" : "group";
     const chatId = uuid(); const now = Date.now();
     db.transaction(() => {
-        db.prepare("INSERT INTO chats (id, name, type, created_by, created_at) VALUES (?, ?, ?, ?, ?)").run(chatId, name, type || 'group', req.userId, now);
+        db.prepare("INSERT INTO chats (id, name, type, created_by, created_at) VALUES (?, ?, ?, ?, ?)").run(chatId, name, type, req.userId, now);
         db.prepare("INSERT INTO chat_members (chat_id, user_id, joined_at, role) VALUES (?, ?, ?, 'admin')").run(chatId, req.userId, now);
     })();
     logSuccess(`Создана группа "${name}"`);
     res.json({ chat_id: chatId });
 });
+
 app.post("/api/chats/add_member", auth, (req, res) => {
-    const { chat_id, username } = req.body;
-    const chat = db.prepare("SELECT type FROM chats WHERE id = ?").get(chat_id);
+    const chatId = cleanString(req.body.chat_id, 64);
+    const username = cleanString(req.body.username, 32);
+    const chat = db.prepare("SELECT type FROM chats WHERE id = ?").get(chatId);
     if (!chat || chat.type === 'direct') return res.status(400).json({ error: "invalid_chat" });
-    const member = db.prepare("SELECT role FROM chat_members WHERE chat_id = ? AND user_id = ?").get(chat_id, req.userId);
+    const member = db.prepare("SELECT role FROM chat_members WHERE chat_id = ? AND user_id = ?").get(chatId, req.userId);
     if (!member || member.role !== 'admin') return res.status(403).json({ error: "not_admin" });
     const user = getUserByUsername(username);
     if (!user) return res.status(404).json({ error: "user_not_found" });
-    db.prepare("INSERT OR IGNORE INTO chat_members (chat_id, user_id, joined_at, role) VALUES (?, ?, ?, 'member')").run(chat_id, user.id, Date.now());
+    db.prepare("INSERT OR IGNORE INTO chat_members (chat_id, user_id, joined_at, role) VALUES (?, ?, ?, 'member')").run(chatId, user.id, Date.now());
     res.json({ ok: true, user_id: user.id });
 });
+
 app.post("/api/chats/read", auth, (req, res) => {
-    db.prepare("UPDATE chat_members SET last_read_at = ? WHERE chat_id = ? AND user_id = ?").run(Date.now(), req.body.chat_id, req.userId);
-    broadcast(req.body.chat_id, { type: "read", chat_id: req.body.chat_id, user_id: req.userId });
+    const chatId = cleanString(req.body.chat_id, 64);
+    const member = db.prepare("SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?").get(chatId, req.userId);
+    if (!member) return res.status(403).json({ error: "not_member" });
+    db.prepare("UPDATE chat_members SET last_read_at = ? WHERE chat_id = ? AND user_id = ?").run(Date.now(), chatId, req.userId);
+    broadcast(chatId, { type: "read", chat_id: chatId, user_id: req.userId });
     res.json({ ok: true });
 });
+
 app.post("/api/chats/delete", auth, (req, res) => {
-    const { chat_id } = req.body;
+    const chatId = cleanString(req.body.chat_id, 64);
+    // КРИТИЧНО: проверяем, что юзер — участник чата
+    const member = db.prepare("SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?").get(chatId, req.userId);
+    if (!member) return res.status(403).json({ error: "not_member" });
     db.transaction(() => {
-        db.prepare("DELETE FROM messages WHERE chat_id = ?").run(chat_id);
-        db.prepare("DELETE FROM chat_members WHERE chat_id = ?").run(chat_id);
-        db.prepare("DELETE FROM chats WHERE id = ?").run(chat_id);
+        db.prepare("DELETE FROM messages WHERE chat_id = ?").run(chatId);
+        db.prepare("DELETE FROM chat_members WHERE chat_id = ?").run(chatId);
+        db.prepare("DELETE FROM chats WHERE id = ?").run(chatId);
     })();
-    broadcast(chat_id, { type: "chat_deleted", chat_id });
+    broadcast(chatId, { type: "chat_deleted", chat_id: chatId });
     res.json({ ok: true });
 });
+
 app.post("/api/chats/pin", auth, (req, res) => {
-    db.prepare("UPDATE chat_members SET is_pinned = ? WHERE chat_id = ? AND user_id = ?").run(req.body.pin ? 1 : 0, req.body.chat_id, req.userId);
+    const chatId = cleanString(req.body.chat_id, 64);
+    db.prepare("UPDATE chat_members SET is_pinned = ? WHERE chat_id = ? AND user_id = ?").run(req.body.pin ? 1 : 0, chatId, req.userId);
     res.json({ ok: true });
 });
+
 app.post("/api/chats/block", auth, (req, res) => {
-    db.prepare("UPDATE chat_members SET is_blocked = ? WHERE chat_id = ? AND user_id = ?").run(req.body.block ? 1 : 0, req.body.chat_id, req.userId);
+    const chatId = cleanString(req.body.chat_id, 64);
+    db.prepare("UPDATE chat_members SET is_blocked = ? WHERE chat_id = ? AND user_id = ?").run(req.body.block ? 1 : 0, chatId, req.userId);
     res.json({ ok: true });
 });
+
 app.get("/api/chats/:chat_id/members", auth, (req, res) => {
+    // КРИТИЧНО: проверяем членство
+    const member = db.prepare("SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?").get(req.params.chat_id, req.userId);
+    if (!member) return res.status(403).json({ error: "not_member" });
     const members = db.prepare(`SELECT u.id, u.username, u.display_name, u.avatar_url, u.badge, u.last_seen, cm.role FROM chat_members cm JOIN users u ON u.id = cm.user_id WHERE cm.chat_id = ?`).all(req.params.chat_id);
     res.json(members);
 });
@@ -341,56 +438,75 @@ app.get("/api/messages/:chat_id", auth, (req, res) => {
     const readers = db.prepare("SELECT user_id, last_read_at FROM chat_members WHERE chat_id = ?").all(req.params.chat_id);
     res.json({ messages, readers });
 });
+
 app.post("/api/messages", auth, (req, res) => {
-    const { chat_id, content_encrypted, iv, reply_to, file_id, is_sticker } = req.body || {};
-    if (!db.prepare("SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?").get(chat_id, req.userId)) return res.status(403).json({ error: "not_member" });
+    const chatId = cleanString(req.body.chat_id, 64);
+    const contentEncrypted = String(req.body.content_encrypted || "");
+    const iv = String(req.body.iv || "");
+    const replyTo = req.body.reply_to ? cleanString(req.body.reply_to, 64) : null;
+    const fileId = req.body.file_id ? cleanString(req.body.file_id, 64) : null;
+    const isSticker = req.body.is_sticker ? 1 : 0;
+
+    if (!chatId || !contentEncrypted) return res.status(400).json({ error: "missing_fields" });
+    if (contentEncrypted.length > 500000) return res.status(400).json({ error: "content_too_large" });
+    if (!db.prepare("SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?").get(chatId, req.userId)) return res.status(403).json({ error: "not_member" });
+
     const id = uuid(); const now = Date.now();
-    db.prepare(`INSERT INTO messages (id, chat_id, sender_id, content_encrypted, iv, reply_to, created_at, file_id, is_sticker) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, chat_id, req.userId, content_encrypted, iv, reply_to || null, now, file_id || null, is_sticker ? 1 : 0);
-    db.prepare("UPDATE chat_members SET last_read_at = ? WHERE chat_id = ? AND user_id = ?").run(now, chat_id, req.userId);
-    const msg = { id, chat_id, sender_id: req.userId, content_encrypted, iv, reply_to, created_at: now, file_id, is_sticker: is_sticker ? 1 : 0 };
+    db.prepare(`INSERT INTO messages (id, chat_id, sender_id, content_encrypted, iv, reply_to, created_at, file_id, is_sticker) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, chatId, req.userId, contentEncrypted, iv, replyTo, now, fileId, isSticker);
+    db.prepare("UPDATE chat_members SET last_read_at = ? WHERE chat_id = ? AND user_id = ?").run(now, chatId, req.userId);
+    const msg = { id, chat_id: chatId, sender_id: req.userId, content_encrypted: contentEncrypted, iv, reply_to: replyTo, created_at: now, file_id: fileId, is_sticker: isSticker };
     res.json(msg);
-    broadcast(chat_id, { type: "message", message: msg });
+    broadcast(chatId, { type: "message", message: msg });
     setImmediate(async () => {
         try {
             const sender = getUserById(req.userId);
-            const chatMembers = db.prepare("SELECT user_id FROM chat_members WHERE chat_id = ? AND user_id != ?").all(chat_id, req.userId);
+            const chatMembers = db.prepare("SELECT user_id FROM chat_members WHERE chat_id = ? AND user_id != ?").all(chatId, req.userId);
             let pushText = "Новое сообщение";
-            if (is_sticker) pushText = "Стикер"; else if (file_id) pushText = "Файл";
-            for (const m of chatMembers) await sendPush(m.user_id, sender.display_name || sender.username, pushText, chat_id);
+            if (isSticker) pushText = "Стикер"; else if (fileId) pushText = "Файл";
+            for (const m of chatMembers) await sendPush(m.user_id, sender?.display_name || sender?.username || "Flash", pushText, chatId);
         } catch (e) { logError(`Ошибка в фоновой отправке пушей: ${e.message}`); }
     });
 });
+
 app.post("/api/messages/delete", auth, (req, res) => {
-    const { msg_id } = req.body;
-    const msg = db.prepare("SELECT sender_id, chat_id FROM messages WHERE id = ?").get(msg_id);
+    const msgId = cleanString(req.body.msg_id, 64);
+    const msg = db.prepare("SELECT sender_id, chat_id FROM messages WHERE id = ?").get(msgId);
     if (!msg) return res.status(404).json({ error: "not_found" });
     const isAuthor = msg.sender_id === req.userId;
     const member = db.prepare("SELECT role FROM chat_members WHERE chat_id = ? AND user_id = ?").get(msg.chat_id, req.userId);
     const isAdmin = member && member.role === 'admin';
     if (!isAuthor && !isAdmin) return res.status(403).json({ error: "no_rights" });
-    db.prepare("UPDATE messages SET is_deleted = 1 WHERE id = ?").run(msg_id);
-    broadcastAll({ type: "message_deleted", msg_id });
+    db.prepare("UPDATE messages SET is_deleted = 1 WHERE id = ?").run(msgId);
+    broadcastAll({ type: "message_deleted", msg_id: msgId });
     res.json({ ok: true });
 });
+
 app.post("/api/messages/edit", auth, (req, res) => {
-    const { msg_id, content_encrypted, iv } = req.body;
-    const msg = db.prepare("SELECT sender_id FROM messages WHERE id = ?").get(msg_id);
+    const msgId = cleanString(req.body.msg_id, 64);
+    const contentEncrypted = String(req.body.content_encrypted || "");
+    const iv = String(req.body.iv || "");
+    if (!msgId || !contentEncrypted) return res.status(400).json({ error: "missing_fields" });
+    if (contentEncrypted.length > 500000) return res.status(400).json({ error: "content_too_large" });
+    const msg = db.prepare("SELECT sender_id, is_deleted FROM messages WHERE id = ?").get(msgId);
     if (!msg) return res.status(404).json({ error: "not_found" });
+    if (msg.is_deleted) return res.status(400).json({ error: "deleted" });
     if (msg.sender_id !== req.userId) return res.status(403).json({ error: "not_author" });
-    db.prepare("UPDATE messages SET content_encrypted = ?, iv = ? WHERE id = ?").run(content_encrypted, iv, msg_id);
-    broadcastAll({ type: "message_edited", msg_id, content_encrypted, iv });
+    db.prepare("UPDATE messages SET content_encrypted = ?, iv = ? WHERE id = ?").run(contentEncrypted, iv, msgId);
+    broadcastAll({ type: "message_edited", msg_id: msgId, content_encrypted: contentEncrypted, iv });
     res.json({ ok: true });
 });
+
 app.post("/api/messages/pin", auth, (req, res) => {
-    const { msg_id, pin } = req.body;
-    const msg = db.prepare("SELECT chat_id FROM messages WHERE id = ?").get(msg_id);
+    const msgId = cleanString(req.body.msg_id, 64);
+    const pin = req.body.pin ? 1 : 0;
+    const msg = db.prepare("SELECT chat_id FROM messages WHERE id = ?").get(msgId);
     if (!msg) return res.status(404).json({ error: "not_found" });
     const member = db.prepare("SELECT role FROM chat_members WHERE chat_id = ? AND user_id = ?").get(msg.chat_id, req.userId);
     if (!member) return res.status(403).json({ error: "not_member" });
     const chat = db.prepare("SELECT type FROM chats WHERE id = ?").get(msg.chat_id);
     if (chat.type !== 'direct' && member.role !== 'admin') return res.status(403).json({ error: "not_admin" });
-    db.prepare("UPDATE messages SET is_pinned = ? WHERE id = ?").run(pin ? 1 : 0, msg_id);
-    broadcastAll({ type: "message_pinned", msg_id, pin });
+    db.prepare("UPDATE messages SET is_pinned = ? WHERE id = ?").run(pin, msgId);
+    broadcastAll({ type: "message_pinned", msg_id: msgId, pin });
     res.json({ ok: true });
 });
 
@@ -398,24 +514,27 @@ app.post("/api/messages/pin", auth, (req, res) => {
 // API ФАЙЛОВ
 // ============================================
 app.post("/api/upload/check", auth, (req, res) => {
-    const { hash } = req.body;
+    const hash = cleanString(req.body.hash, 128);
     if (!hash) return res.status(400).json({ error: "missing_hash" });
     const file = db.prepare("SELECT id FROM files WHERE hash = ?").get(hash);
     res.json({ exists: !!file, file_id: file?.id || null });
 });
+
 app.post("/api/upload", auth, upload.single("file"), (req, res) => {
     if (!req.file) return res.status(400).json({ error: "no_file" });
-    const { chat_id, hash } = req.body;
-    if (!chat_id || !hash) { fs.unlinkSync(req.file.path); return res.status(400).json({ error: "missing_fields" }); }
-    const member = db.prepare("SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?").get(chat_id, req.userId);
-    if (!member) { fs.unlinkSync(req.file.path); return res.status(403).json({ error: "not_member" }); }
+    const chatId = cleanString(req.body.chat_id, 64);
+    const hash = cleanString(req.body.hash, 128);
+    if (!chatId || !hash) { try { fs.unlinkSync(req.file.path); } catch (e) {} return res.status(400).json({ error: "missing_fields" }); }
+    const member = db.prepare("SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?").get(chatId, req.userId);
+    if (!member) { try { fs.unlinkSync(req.file.path); } catch (e) {} return res.status(403).json({ error: "not_member" }); }
     const existing = db.prepare("SELECT id FROM files WHERE hash = ?").get(hash);
-    if (existing) { fs.unlinkSync(req.file.path); return res.json({ file_id: existing.id, deduplicated: true }); }
+    if (existing) { try { fs.unlinkSync(req.file.path); } catch (e) {} return res.json({ file_id: existing.id, deduplicated: true }); }
     const fileId = uuid(); const now = Date.now();
     db.prepare("INSERT INTO files (id, hash, file_path, file_name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(fileId, hash, req.file.path, req.file.originalname, req.file.mimetype, req.file.size, now);
     logInfo(`Загружен файл: ${req.file.originalname} (${(req.file.size / 1024 / 1024).toFixed(2)} MB)`);
     res.json({ file_id: fileId, deduplicated: false });
 });
+
 app.get("/api/files/:file_id", (req, res) => {
     let token = req.query.token;
     if (!token && req.headers.authorization) token = req.headers.authorization.replace("Bearer ", "");
@@ -446,8 +565,9 @@ app.get("/api/stickers/packs", auth, (req, res) => {
     });
     res.json(result);
 });
+
 app.post("/api/stickers/packs", auth, (req, res) => {
-    const { name } = req.body;
+    const name = cleanString(req.body.name, 64);
     if (!name) return res.status(400).json({ error: "missing_name" });
     const existing = db.prepare("SELECT id FROM sticker_packs WHERE name = ? AND creator_id = ?").get(name, req.userId);
     if (existing) return res.status(400).json({ error: "pack_already_exists" });
@@ -456,37 +576,44 @@ app.post("/api/stickers/packs", auth, (req, res) => {
     logSuccess(`Создан стикер-пак "${name}"`);
     res.json({ id, name });
 });
+
 app.post("/api/stickers/packs/delete", auth, (req, res) => {
-    const { pack_id } = req.body;
-    const pack = db.prepare("SELECT creator_id FROM sticker_packs WHERE id = ?").get(pack_id);
+    const packId = cleanString(req.body.pack_id, 64);
+    const pack = db.prepare("SELECT creator_id FROM sticker_packs WHERE id = ?").get(packId);
     if (!pack) return res.status(404).json({ error: "not_found" });
     if (pack.creator_id !== req.userId) return res.status(403).json({ error: "not_creator" });
     db.transaction(() => {
-        db.prepare("DELETE FROM stickers WHERE pack_id = ?").run(pack_id);
-        db.prepare("DELETE FROM sticker_packs WHERE id = ?").run(pack_id);
-        db.prepare("DELETE FROM user_sticker_packs WHERE pack_id = ?").run(pack_id);
+        db.prepare("DELETE FROM stickers WHERE pack_id = ?").run(packId);
+        db.prepare("DELETE FROM sticker_packs WHERE id = ?").run(packId);
+        db.prepare("DELETE FROM user_sticker_packs WHERE pack_id = ?").run(packId);
     })();
     res.json({ ok: true });
 });
+
 app.post("/api/stickers/packs/subscribe", auth, (req, res) => {
-    db.prepare("INSERT OR IGNORE INTO user_sticker_packs (user_id, pack_id) VALUES (?, ?)").run(req.userId, req.body.pack_id);
+    const packId = cleanString(req.body.pack_id, 64);
+    const pack = db.prepare("SELECT 1 FROM sticker_packs WHERE id = ?").get(packId);
+    if (!pack) return res.status(404).json({ error: "not_found" });
+    db.prepare("INSERT OR IGNORE INTO user_sticker_packs (user_id, pack_id) VALUES (?, ?)").run(req.userId, packId);
     res.json({ ok: true });
 });
+
 app.post("/api/stickers/add", auth, upload.single("sticker"), (req, res) => {
     if (!req.file) return res.status(400).json({ error: "no_file" });
-    const { pack_id, hash } = req.body;
-    const pack = db.prepare("SELECT creator_id FROM sticker_packs WHERE id = ?").get(pack_id);
-    if (!pack || pack.creator_id !== req.userId) { fs.unlinkSync(req.file.path); return res.status(403).json({ error: "not_creator" }); }
+    const packId = cleanString(req.body.pack_id, 64);
+    const hash = cleanString(req.body.hash, 128);
+    const pack = db.prepare("SELECT creator_id FROM sticker_packs WHERE id = ?").get(packId);
+    if (!pack || pack.creator_id !== req.userId) { try { fs.unlinkSync(req.file.path); } catch (e) {} return res.status(403).json({ error: "not_creator" }); }
     const existingFile = db.prepare("SELECT id FROM files WHERE hash = ?").get(hash);
     let fileId;
-    if (existingFile) { fs.unlinkSync(req.file.path); fileId = existingFile.id; }
+    if (existingFile) { try { fs.unlinkSync(req.file.path); } catch (e) {} fileId = existingFile.id; }
     else {
         fileId = uuid();
         db.prepare("INSERT INTO files (id, hash, file_path, file_name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
           .run(fileId, hash, req.file.path, req.file.originalname, req.file.mimetype, req.file.size, Date.now());
     }
     const stickerId = uuid();
-    db.prepare("INSERT INTO stickers (id, pack_id, file_id, created_at) VALUES (?, ?, ?, ?)").run(stickerId, pack_id, fileId, Date.now());
+    db.prepare("INSERT INTO stickers (id, pack_id, file_id, created_at) VALUES (?, ?, ?, ?)").run(stickerId, packId, fileId, Date.now());
     res.json({ id: stickerId, file_id: fileId });
 });
 
@@ -494,14 +621,20 @@ app.post("/api/stickers/add", auth, upload.single("sticker"), (req, res) => {
 // API ПУШЕЙ
 // ============================================
 app.post("/api/push/register", auth, (req, res) => {
-    const { token, platform } = req.body;
+    const token = cleanString(req.body.token, 512);
+    const platform = cleanString(req.body.platform, 16) || "android";
     if (!token) return res.status(400).json({ error: "no_token" });
-    db.prepare("INSERT OR IGNORE INTO push_tokens (user_id, token, platform) VALUES (?, ?, ?)").run(req.userId, token, platform || 'android');
+    db.prepare("INSERT OR IGNORE INTO push_tokens (user_id, token, platform) VALUES (?, ?, ?)").run(req.userId, token, platform);
     logInfo(`Зарегистрирован push-токен для юзера ${req.userId}`);
     res.json({ ok: true });
 });
+
 async function sendPush(userId, title, body, chatId) {
     try {
+        // Не шлём пуши забаненным
+        const user = db.prepare("SELECT is_banned FROM users WHERE id = ?").get(userId);
+        if (!user || user.is_banned) return;
+
         const tokens = db.prepare("SELECT token FROM push_tokens WHERE user_id = ?").all(userId);
         if (tokens.length === 0) return;
         for (const t of tokens) {
@@ -510,7 +643,7 @@ async function sendPush(userId, title, body, chatId) {
                     admin.messaging().send({ token: t.token, notification: { title, body }, data: { chat_id: chatId } }),
                     new Promise((_, rej) => setTimeout(() => rej(new Error("push timeout")), 5000))
                 ]);
-                logPush(`Отправлен пуш на устройство (юзер: ${title})`);
+                logInfo(`Отправлен пуш на устройство (юзер: ${userId})`);
             } catch (e) {
                 if (e.code === 'messaging/registration-token-not-registered' || e.code === 'messaging/invalid-argument') {
                     db.prepare("DELETE FROM push_tokens WHERE token = ?").run(t.token);
@@ -528,6 +661,7 @@ app.get("/api/admin/check", auth, (req, res) => {
     const user = db.prepare("SELECT is_admin FROM users WHERE id = ?").get(req.userId);
     res.json({ is_admin: user?.is_admin === 1 });
 });
+
 app.get("/api/admin/stats", auth, adminAuth, (req, res) => {
     res.json({
         users: db.prepare("SELECT COUNT(*) as count FROM users").get().count,
@@ -536,48 +670,69 @@ app.get("/api/admin/stats", auth, adminAuth, (req, res) => {
         online: clients.size
     });
 });
+
 app.get("/api/admin/users", auth, adminAuth, (req, res) => {
     res.json(db.prepare("SELECT id, username, display_name, created_at, last_seen, is_banned, is_admin, badge FROM users ORDER BY created_at DESC").all());
 });
+
 app.post("/api/admin/ban", auth, adminAuth, (req, res) => {
     db.prepare("UPDATE users SET is_banned = ? WHERE id = ?").run(req.body.ban ? 1 : 0, req.body.user_id);
     logWarn(`Бан/разбан юзера ${req.body.user_id}`);
     res.json({ ok: true });
 });
+
 app.post("/api/admin/promote", auth, adminAuth, (req, res) => {
     db.prepare("UPDATE users SET is_admin = ? WHERE id = ?").run(req.body.promote ? 1 : 0, req.body.user_id);
     res.json({ ok: true });
 });
+
 app.post("/api/admin/badge", auth, adminAuth, (req, res) => {
-    db.prepare("UPDATE users SET badge = ? WHERE id = ?").run(req.body.badge || "", req.body.user_id);
+    const badge = cleanString(req.body.badge, 30);
+    db.prepare("UPDATE users SET badge = ? WHERE id = ?").run(badge, req.body.user_id);
     res.json({ ok: true });
 });
+
 app.post("/api/admin/delete", auth, adminAuth, (req, res) => {
-    const { user_id } = req.body;
+    const userId = cleanString(req.body.user_id, 64);
+    // Удаляем аватарку
+    try {
+        const u = getUserById(userId);
+        if (u?.avatar_url) {
+            const oldPath = path.join(UPLOADS_DIR, path.basename(u.avatar_url));
+            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
+    } catch (e) {}
     db.transaction(() => {
-        db.prepare("DELETE FROM chat_members WHERE user_id = ?").run(user_id);
-        db.prepare("DELETE FROM messages WHERE sender_id = ?").run(user_id);
-        db.prepare("DELETE FROM users WHERE id = ?").run(user_id);
-        db.prepare("DELETE FROM push_tokens WHERE user_id = ?").run(user_id);
+        db.prepare("DELETE FROM chat_members WHERE user_id = ?").run(userId);
+        db.prepare("DELETE FROM messages WHERE sender_id = ?").run(userId);
+        db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+        db.prepare("DELETE FROM push_tokens WHERE user_id = ?").run(userId);
+        db.prepare("DELETE FROM sticker_packs WHERE creator_id = ?").run(userId);
+        db.prepare("DELETE FROM user_sticker_packs WHERE user_id = ?").run(userId);
     })();
-    logWarn(`Удален юзер ${user_id}`);
+    logWarn(`Удален юзер ${userId}`);
     res.json({ ok: true });
 });
+
 app.post("/api/admin/broadcast", auth, adminAuth, (req, res) => {
-    broadcastAll({ type: "broadcast", text: req.body.text });
-    logInfo(`Отправлена рассылка: "${req.body.text}"`);
+    const text = cleanString(req.body.text, 1000);
+    if (!text) return res.status(400).json({ error: "empty" });
+    broadcastAll({ type: "broadcast", text });
+    logInfo(`Отправлена рассылка: "${text}"`);
     res.json({ ok: true });
 });
+
 app.get("/api/admin/tech", auth, adminAuth, (req, res) => {
     const mem = process.memoryUsage();
     res.json({ uptime: Math.floor(process.uptime()), memory_rss: Math.round(mem.rss/1024/1024) + " MB", node_version: process.version, platform: process.platform });
 });
+
 app.get("/api/admin/logs", auth, adminAuth, (req, res) => {
     res.json(db.prepare(`SELECT m.id, m.chat_id, m.sender_id, u.username as sender_name, m.created_at, m.content_encrypted FROM messages m JOIN users u ON m.sender_id = u.id ORDER BY m.created_at DESC LIMIT 100`).all());
 });
 
 // ============================================
-// WEBSOCKET (БЕЗ ЗВОНКОВ)
+// WEBSOCKET
 // ============================================
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: "/ws" });
@@ -604,16 +759,17 @@ wss.on("connection", (ws, req) => {
             broadcastAll({ type: "presence", user_id: userId, status: "offline" });
         }
     });
+    ws.on("error", () => {});
 });
 
 function broadcast(chatId, data) {
     const members = db.prepare("SELECT user_id FROM chat_members WHERE chat_id = ?").all(chatId);
     const payload = JSON.stringify(data);
-    members.forEach(m => clients.get(m.user_id)?.forEach(ws => ws.readyState === 1 && ws.send(payload)));
+    members.forEach(m => clients.get(m.user_id)?.forEach(ws => { try { if (ws.readyState === 1) ws.send(payload); } catch (e) {} }));
 }
 function broadcastAll(data) {
     const payload = JSON.stringify(data);
-    clients.forEach(set => set.forEach(ws => ws.readyState === 1 && ws.send(payload)));
+    clients.forEach(set => set.forEach(ws => { try { if (ws.readyState === 1) ws.send(payload); } catch (e) {} }));
 }
 
 server.listen(PORT, "0.0.0.0", () => {

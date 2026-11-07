@@ -2,7 +2,7 @@
     "name": "Flash — мессенджер",
     "short_name": "Flash",
     "description": "Просто. Быстро. Надёжно.",
-    "start_url": "/",
+    "start_url": "/web.html",
     "scope": "/",
     "display": "standalone",
     "orientation": "any",

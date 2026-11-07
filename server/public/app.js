@@ -3,6 +3,7 @@
 // ============================================
 const STORAGE_KEY = "flash_state_v1";
 const PERSONALIZATION_KEY = "flash_personalization_v1";
+const CRYPTO_KEY_STORAGE = "flash_crypto_key_v1";
 const DEFAULT_SERVER_URL = "https://localhost:8080";
 
 let state = { servers: [], active_server_id: null };
@@ -22,7 +23,6 @@ let ctxTargetChatId = null;
 let messagesCache = [];
 let isLoadingChats = false;
 
-// Персонализация
 let personalization = { accent: "#ff2d6f", wallpaper: "default", customWallpaper: "" };
 
 const ACCENT_PRESETS = [
@@ -122,10 +122,12 @@ function loadPersonalization() {
 function savePersonalization() { try { localStorage.setItem(PERSONALIZATION_KEY, JSON.stringify(personalization)); } catch (e) {} }
 function hexToRgba(hex, alpha) {
     const h = hex.replace("#", "");
+    if (!/^[0-9a-f]{6}$/i.test(h)) return `rgba(255, 45, 111, ${alpha})`;
     return `rgba(${parseInt(h.substring(0, 2), 16)}, ${parseInt(h.substring(2, 4), 16)}, ${parseInt(h.substring(4, 6), 16)}, ${alpha})`;
 }
 function lightenHex(hex, percent) {
     const h = hex.replace("#", "");
+    if (!/^[0-9a-f]{6}$/i.test(h)) return hex;
     let r = parseInt(h.substring(0, 2), 16), g = parseInt(h.substring(2, 4), 16), b = parseInt(h.substring(4, 6), 16);
     r = Math.min(255, Math.round(r + (255 - r) * percent)); g = Math.min(255, Math.round(g + (255 - g) * percent)); b = Math.min(255, Math.round(b + (255 - b) * percent));
     return "#" + [r, g, b].map(x => x.toString(16).padStart(2, "0")).join("");
@@ -176,22 +178,41 @@ function renderPersonalizationPickers() {
 
 // ============================================
 // ШИФРОВАНИЕ
+// ВАЖНО: ключ генерируется СЛУЧАЙНО и хранится в localStorage.
+// Это per-device: на другом устройстве — другой ключ, старые сообщения не прочитаются.
+// Для настоящего E2EE между устройствами нужен password-based KDF (TODO).
 // ============================================
-async function initCrypto() { 
+async function getOrCreateCryptoKey() {
+    let keyB64 = null;
+    try { keyB64 = localStorage.getItem(CRYPTO_KEY_STORAGE); } catch (e) {}
+    let keyBytes = null;
+    if (keyB64) {
+        try {
+            keyBytes = Uint8Array.from(atob(keyB64), c => c.charCodeAt(0));
+            if (!keyBytes || keyBytes.length !== 32) keyBytes = null;
+        } catch (e) { keyBytes = null; }
+    }
+    if (!keyBytes) {
+        keyBytes = crypto.getRandomValues(new Uint8Array(32));
+        try { localStorage.setItem(CRYPTO_KEY_STORAGE, btoa(String.fromCharCode(...keyBytes))); } catch (e) {}
+    }
+    return await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+
+async function initCrypto() {
     try {
-        cryptoKey = await crypto.subtle.importKey("raw", new Uint8Array(32), { name: "AES-GCM" }, false, ["encrypt", "decrypt"]); 
-    } catch(e) {
+        cryptoKey = await getOrCreateCryptoKey();
+    } catch (e) {
         console.error("Crypto init failed:", e);
     }
 }
 async function encryptText(text) {
-    if (!cryptoKey) return { ciphertext: btoa(unescape(encodeURIComponent(text))), iv: "" };
+    if (!cryptoKey) throw new Error("crypto_not_ready");
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, cryptoKey, new TextEncoder().encode(text));
     return { ciphertext: btoa(String.fromCharCode(...new Uint8Array(cipher))), iv: btoa(String.fromCharCode(...new Uint8Array(iv))) };
 }
 async function decryptText(ciphertextB64, ivB64) {
-    if (!ivB64) { try { return decodeURIComponent(escape(atob(ciphertextB64))); } catch(e) { return "[ошибка]"; } }
     if (!cryptoKey) return "[нет ключа]";
     try {
         const cipher = Uint8Array.from(atob(ciphertextB64), c => c.charCodeAt(0));
@@ -205,7 +226,7 @@ async function hashFile(file) {
         const arrayBuffer = await file.arrayBuffer();
         const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
         return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-    } catch(e) { return "fakehash_" + file.name + "_" + file.size; }
+    } catch (e) { return "fakehash_" + file.name + "_" + file.size; }
 }
 
 // ============================================
@@ -329,6 +350,7 @@ async function doAuth() {
         const username = $("auth-username").value.trim().toLowerCase();
         const password = $("auth-password").value;
         if (!username || !password) { status.textContent = "Заполни все поля"; return; }
+        if (password.length < 6) { status.textContent = "Пароль минимум 6 символов"; return; }
         tempRegData = { username, password }; registrationStep = 2;
         $("auth-step-2").classList.remove("hidden");
         $("field-username").classList.add("hidden");
@@ -373,7 +395,7 @@ async function doAuth() {
         if (!autoLogin) { currentAccount = null; currentServer.account = null; currentUser = null; saveState(); status.textContent = "Вошли, но автовход выключен"; submit.disabled = false; return; }
         saveState(); status.textContent = ""; await showApp();
     } catch (e) {
-        const msgs = { invalid_credentials: "Неверный логин или пароль", username_taken: "Username занят", user_banned: "Ты забанен на этом сервере", missing_fields: "Заполни поля" };
+        const msgs = { invalid_credentials: "Неверный логин или пароль", username_taken: "Username занят", user_banned: "Ты забанен на этом сервере", missing_fields: "Заполни поля", password_too_short: "Пароль минимум 6 символов", rate_limited: "Слишком много попыток, подожди" };
         status.textContent = msgs[e.message] || e.message; submit.disabled = false;
     }
 }
@@ -425,9 +447,12 @@ async function showApp() {
 // ЧАТЫ
 // ============================================
 function getAvatarHtml(user, sizeClass = "") {
-    if (user && user.avatar_url) return `<img src="${currentServer.address.replace(/\/$/, "")}${user.avatar_url}" class="avatar ${sizeClass}" style="object-fit: cover;">`;
+    if (user && user.avatar_url) {
+        const src = escapeHtml(currentServer.address.replace(/\/$/, "") + user.avatar_url);
+        return `<img src="${src}" class="avatar ${sizeClass}" style="object-fit: cover;">`;
+    }
     const letter = (user?.display_name || user?.username || "?")[0].toUpperCase();
-    return `<div class="avatar ${sizeClass}">${letter}</div>`;
+    return `<div class="avatar ${sizeClass}">${escapeHtml(letter)}</div>`;
 }
 async function loadChats() {
     if (isLoadingChats) return;
@@ -443,7 +468,7 @@ async function loadChats() {
             const isOnline = chat.other_user && onlineUsers.has(chat.other_user.id);
             let avatarHtml = getAvatarHtml(chat.other_user);
             if (isOnline) avatarHtml = `<div style="position:relative;">${avatarHtml}<div style="position:absolute;bottom:0;right:0;width:12px;height:12px;background:var(--green);border:2px solid var(--bg-soft);border-radius:50%;"></div></div>`;
-            const badge = chat.other_user?.badge ? `<span style="font-size:9px; background:var(--accent); padding:2px 6px; border-radius:10px; margin-left: 5px; color: #fff; white-space: nowrap;">${chat.other_user.badge}</span>` : '';
+            const badge = chat.other_user?.badge ? `<span style="font-size:9px; background:var(--accent); padding:2px 6px; border-radius:10px; margin-left: 5px; color: #fff; white-space: nowrap;">${escapeHtml(chat.other_user.badge)}</span>` : '';
             const statusHtml = chat.type === 'direct' && chat.other_user ? `<div class="chat-item-preview" style="color: ${isOnline ? 'var(--green)' : 'var(--gray)'}">${isOnline ? 'онлайн' : 'не в сети'}</div>` : `<div class="chat-item-preview">${chat.type === 'group' ? 'Группа' : 'Канал'}</div>`;
             const el = document.createElement("div");
             el.className = "chat-item" + (currentChat?.id === chat.id ? " active" : "");
@@ -462,12 +487,20 @@ async function loadChats() {
 }
 async function openChat(chat) {
     currentChat = chat;
+    // Сбрасываем pendingFile при смене чата
+    pendingFile = null;
+    const fileInput = $("file-input"); if (fileInput) fileInput.value = "";
+    const cameraInput = $("camera-input"); if (cameraInput) cameraInput.value = "";
+    $("attach-menu")?.classList.add("hidden");
+    const msgInput = $("msg-input");
+    if (msgInput) msgInput.placeholder = "Пиши что-нибудь...";
+
     $("app-screen").classList.add("chat-open");
     document.body.classList.add("chat-open");
     $("empty-state").classList.add("hidden");
     $("active-chat").classList.remove("hidden");
     const name = chat.other_user?.display_name || chat.other_user?.username || chat.name || "Чат";
-    const badge = chat.other_user?.badge ? ` <span style="font-size: 11px; background: var(--accent); padding: 2px 8px; border-radius: 10px; margin-left: 8px;">${chat.other_user.badge}</span>` : '';
+    const badge = chat.other_user?.badge ? ` <span style="font-size: 11px; background: var(--accent); padding: 2px 8px; border-radius: 10px; margin-left: 8px;">${escapeHtml(chat.other_user.badge)}</span>` : '';
     $("chat-name").innerHTML = escapeHtml(name) + badge;
     const avatarContainer = $("chat-avatar-container");
     if (avatarContainer) avatarContainer.innerHTML = getAvatarHtml(chat.other_user, "avatar-sm");
@@ -486,7 +519,7 @@ async function openChat(chat) {
             $("profile-avatar").innerHTML = getAvatarHtml(u, "").replace('class="avatar"', 'class="avatar" style="width:80px;height:80px;font-size:30px;"');
             $("profile-name").textContent = u.display_name || u.username;
             $("profile-username").textContent = "@" + u.username;
-            $("profile-badge").innerHTML = u.badge ? `<span class="badge custom">${u.badge}</span>` : '';
+            $("profile-badge").innerHTML = u.badge ? `<span class="badge custom">${escapeHtml(u.badge)}</span>` : '';
             const isOnline = onlineUsers.has(u.id);
             $("profile-status").textContent = "Статус: " + (isOnline ? "в сети" : "не в сети");
             $("profile-status").style.color = isOnline ? "var(--green)" : "var(--gray)";
@@ -544,8 +577,9 @@ function renderMessage(text, isOut, timeIso, msgId, replyTo, senderUsername, fil
     const textContainer = document.createElement("div");
     textContainer.className = "msg-text"; textContainer.textContent = text;
     if (text) bubble.appendChild(textContainer);
+    let fileUrl = null;
     if (fileId) {
-        const fileUrl = `${currentServer.address.replace(/\/$/, "")}/api/files/${fileId}?token=${currentAccount.token}`;
+        fileUrl = `${currentServer.address.replace(/\/$/, "")}/api/files/${fileId}?token=${currentAccount.token}`;
         if (isSticker) {
             const img = document.createElement("img");
             img.className = "sticker-image"; img.src = fileUrl;
@@ -612,10 +646,6 @@ function renderMessage(text, isOut, timeIso, msgId, replyTo, senderUsername, fil
         const dlBtn = menu.querySelector('[data-action="download"]');
         if (fileId) { dlBtn.style.display = "block"; dlBtn.onclick = () => { const tempA = document.createElement("a"); tempA.href = fileUrl + "&download=1"; tempA.download = "file"; tempA.click(); $("msg-context-menu").classList.add("hidden"); }; }
         else dlBtn.style.display = "none";
-        menu.querySelector('[data-action="reply"]').onclick = () => {
-            replyingTo = { id: msgId, text: text ? text.substring(0, 40) : "", username: senderUsername };
-            $("reply-preview").style.display = "flex"; $("reply-text").textContent = text ? (text.substring(0, 40) + (text.length > 40 ? "…" : "")) : "📎 Файл"; $("msg-input").focus(); menu.classList.add("hidden");
-        };
     };
     row.appendChild(bubble); $("messages").appendChild(row);
 }
@@ -623,15 +653,23 @@ function scrollToBottom() { $("messages").scrollTop = $("messages").scrollHeight
 async function sendMessage() {
     if (!currentChat) return;
     const input = $("msg-input"), text = input.value.trim();
+
     if (pendingFile) {
+        const fileToSend = pendingFile;
+        pendingFile = null;
+        const savedText = text;
+        input.value = ""; input.placeholder = "Пиши что-нибудь...";
+        $("file-input").value = "";
+        $("camera-input").value = "";
+        $("attach-menu")?.classList.add("hidden");
         try {
-            const hash = await hashFile(pendingFile);
+            const hash = await hashFile(fileToSend);
             const check = await apiRequest("/api/upload/check", { method: "POST", body: JSON.stringify({ hash }) });
             let fileId;
             if (check.exists) fileId = check.file_id;
             else {
                 const formData = new FormData();
-                formData.append("file", pendingFile); formData.append("chat_id", currentChat.id); formData.append("hash", hash);
+                formData.append("file", fileToSend); formData.append("chat_id", currentChat.id); formData.append("hash", hash);
                 const uploadRes = await fetch(currentServer.address.replace(/\/$/, "") + "/api/upload", { method: "POST", headers: { "Authorization": "Bearer " + currentAccount.token }, body: formData });
                 const uploadData = await uploadRes.json();
                 if (uploadData.error) throw new Error(uploadData.error);
@@ -641,10 +679,24 @@ async function sendMessage() {
             const msg = await apiRequest("/api/messages", { method: "POST", body: JSON.stringify({ chat_id: currentChat.id, content_encrypted: enc.ciphertext, iv: enc.iv, file_id: fileId, is_sticker: 0 }) });
             messagesCache.push(normalizeMessage(msg, "", currentUser.username));
             renderMessage("", true, msg.created_at, msg.id, null, currentUser.username, fileId, 0);
-            scrollToBottom(); pendingFile = null; input.value = ""; input.placeholder = "Пиши что-нибудь..."; $("file-input").value = "";
+            scrollToBottom();
+        } catch (e) {
+            console.error(e);
+            alert("Ошибка загрузки: " + (e.message || "unknown"));
+            // Вернуть файл и текст, чтобы можно было повторить
+            pendingFile = fileToSend;
+            input.value = savedText;
+            input.placeholder = `Файл: ${fileToSend.name} (нажми Enter)`;
             return;
-        } catch (e) { console.error(e); alert("Ошибка загрузки"); pendingFile = null; return; }
+        }
+        // Если был текст — отправим его отдельным сообщением
+        if (savedText) {
+            input.value = savedText;
+            await sendMessage();
+        }
+        return;
     }
+
     if (!text) return;
     input.value = ""; input.placeholder = "Пиши что-нибудь...";
     const currentReply = replyingTo; replyingTo = null;
@@ -657,7 +709,11 @@ async function sendMessage() {
         messagesCache.push(normalizeMessage(msg, text, currentUser.username));
         renderMessage(text, true, msg.created_at, msg.id, msg.reply_to, currentUser.username, null, 0);
         scrollToBottom();
-    } catch (e) { console.error(e); }
+    } catch (e) {
+        console.error(e);
+        input.value = text; // вернуть текст
+        alert("Ошибка отправки: " + (e.message || "unknown"));
+    }
 }
 
 // ============================================
@@ -677,7 +733,7 @@ function openMediaViewer(url, type, senderName, text, msgId) {
     overlay.appendChild(mediaEl);
     const panel = document.createElement("div"); panel.className = "media-viewer-panel";
     const info = document.createElement("div"); info.className = "media-viewer-info";
-    info.innerHTML = `<div class="media-viewer-avatar">${(senderName || "?")[0].toUpperCase()}</div><div class="media-viewer-name">${escapeHtml(senderName || "Пользователь")}</div>`;
+    info.innerHTML = `<div class="media-viewer-avatar">${escapeHtml((senderName || "?")[0].toUpperCase())}</div><div class="media-viewer-name">${escapeHtml(senderName || "Пользователь")}</div>`;
     panel.appendChild(info);
     const actions = document.createElement("div"); actions.className = "media-viewer-actions";
     const gotoBtn = document.createElement("button"); gotoBtn.className = "media-action-btn";
@@ -859,14 +915,21 @@ function subscribeWebSocket() {
                 }
             }
         };
-        currentChannel.onclose = () => setTimeout(() => { if (currentChat) subscribeWebSocket(); }, 3000);
+        currentChannel.onclose = () => setTimeout(() => { if (currentChat && currentAccount) subscribeWebSocket(); }, 3000);
     } catch (e) {}
 }
 
 // ============================================
 // УТИЛИТЫ
 // ============================================
-function escapeHtml(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function escapeHtml(s) {
+    return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
 function openModal(id) { $(id)?.classList.remove("hidden"); }
 function closeModal(id) { $(id)?.classList.add("hidden"); }
 function switchSettingsSection(section) {
@@ -877,7 +940,8 @@ function switchSettingsSection(section) {
         $("settings-display-name").value = currentUser.display_name || "";
         const preview = $("settings-avatar-preview");
         if (currentUser.avatar_url) {
-            preview.innerHTML = `<img src="${currentServer.address.replace(/\/$/, "")}${currentUser.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+            const src = escapeHtml(currentServer.address.replace(/\/$/, "") + currentUser.avatar_url);
+            preview.innerHTML = `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
         } else {
             preview.textContent = (currentUser.display_name || currentUser.username || "?")[0].toUpperCase();
         }
@@ -908,7 +972,7 @@ async function renderServersList() {
                     <div class="server-item-addr">${escapeHtml(server.address)}</div>
                     <div class="server-item-status ${status.status}">${statusText}</div>
                 </div>
-                <button class="server-item-menu" data-server-id="${server.id}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>`;
+                <button class="server-item-menu" data-server-id="${escapeHtml(server.id)}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>`;
             item.addEventListener("click", async (e) => { if (e.target.closest(".server-item-menu")) return; await selectServer(server.id); });
             item.querySelector(".server-item-menu").addEventListener("click", (e) => { e.stopPropagation(); openServerMenu(server.id); });
             el.appendChild(item);
@@ -978,8 +1042,10 @@ function loadMobileSettings() {
     $("mobile-input-username").value = currentUser.username || "";
     $("mobile-input-display").value = currentUser.display_name || "";
     const avatarEl = $("mobile-settings-avatar");
-    if (currentUser.avatar_url) avatarEl.innerHTML = `<img src="${currentServer.address.replace(/\/$/, "")}${currentUser.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
-    else avatarEl.textContent = (currentUser.display_name || currentUser.username || "?")[0].toUpperCase();
+    if (currentUser.avatar_url) {
+        const src = escapeHtml(currentServer.address.replace(/\/$/, "") + currentUser.avatar_url);
+        avatarEl.innerHTML = `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    } else avatarEl.textContent = (currentUser.display_name || currentUser.username || "?")[0].toUpperCase();
 }
 function showMobileSubScreen(id) { hideMobileSubScreens(); const el = $(id); if (el) { el.classList.remove("closing"); el.classList.add("active"); } }
 function hideMobileSubScreens() {
@@ -1008,18 +1074,17 @@ function bindEvents() {
     $("tab-register")?.addEventListener("click", () => setAuthMode("register"));
     $("auth-submit")?.addEventListener("click", doAuth);
     $("auth-password")?.addEventListener("keydown", (e) => { if (e.key === "Enter") doAuth(); });
+    $("hint-switch")?.addEventListener("click", (e) => { e.preventDefault(); setAuthMode(authMode === "login" ? "register" : "login"); });
 
-    // Превью аватарки в регистрации
     $("reg-avatar-input")?.addEventListener("change", async (e) => {
         const file = e.target.files[0];
         if (!file) return;
         try {
             const dataUrl = await readFileAsDataURL(file);
-            const preview = $("reg-avatar-preview");
-            setPreviewAvatar(preview, dataUrl);
+            setPreviewAvatar($("reg-avatar-preview"), dataUrl);
         } catch (err) { console.error(err); }
     });
-    
+
     // --- Основное ---
     $("send-btn")?.addEventListener("click", sendMessage);
     $("msg-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
@@ -1047,8 +1112,9 @@ function bindEvents() {
     });
     $("logout-btn")?.addEventListener("click", () => {
         if (!confirm("Выйти из аккаунта?")) return;
+        currentChat = null;
         currentAccount = null; currentUser = null; if (currentServer) currentServer.account = null;
-        saveState(); if (currentChannel) currentChannel.close(); stopChatPolling(); showAuth();
+        saveState(); if (currentChannel) { try { currentChannel.close(); } catch(e){} currentChannel = null; } stopChatPolling(); showAuth();
     });
 
     // --- Настройки ---
@@ -1060,7 +1126,6 @@ function bindEvents() {
     document.querySelectorAll(".settings-nav[data-section]").forEach((btn) => btn.addEventListener("click", () => switchSettingsSection(btn.dataset.section)));
     $("settings-profile-save")?.addEventListener("click", saveProfile);
 
-    // Смена аватарки в десктопных настройках
     $("profile-avatar-input-desktop")?.addEventListener("change", async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -1088,7 +1153,6 @@ function bindEvents() {
         }
     });
 
-    // Смена аватарки в мобильных настройках
     $("mobile-avatar-input")?.addEventListener("change", async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -1145,8 +1209,9 @@ function bindEvents() {
     });
     $("mobile-btn-logout")?.addEventListener("click", () => {
         if (!confirm("Выйти из аккаунта?")) return;
+        currentChat = null;
         currentAccount = null; currentUser = null; if (currentServer) currentServer.account = null;
-        saveState(); if (currentChannel) currentChannel.close(); stopChatPolling(); showAuth();
+        saveState(); if (currentChannel) { try { currentChannel.close(); } catch(e){} currentChannel = null; } stopChatPolling(); showAuth();
     });
     $("mobile-settings-save")?.addEventListener("click", () => {
         const username = $("mobile-input-username").value.trim().toLowerCase();
@@ -1164,7 +1229,7 @@ function bindEvents() {
         else { switchSettingsSection("servers"); openModal("settings-modal"); }
     });
     $("add-server-btn")?.addEventListener("click", () => { closeModal("settings-modal"); openModal("add-server-modal"); });
-    $("mobile-add-server-btn")?.addEventListener("click", () => { closeModal("mobile-servers-screen"); openModal("add-server-modal"); });
+    $("mobile-add-server-btn")?.addEventListener("click", () => { hideMobileSubScreens(); openModal("add-server-modal"); });
     $("add-server-close")?.addEventListener("click", () => { closeModal("add-server-modal"); });
     $("add-server-submit")?.addEventListener("click", async () => {
         const addr = $("add-server-address").value.trim();
@@ -1188,11 +1253,37 @@ function bindEvents() {
         loadStickerPacks();
     });
 
-    // --- Вложения ---
-    $("attach-btn")?.addEventListener("click", () => $("file-input").click());
+    // --- Вложения: attach-menu ---
+    $("attach-btn")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        $("attach-menu")?.classList.toggle("hidden");
+    });
+    $("attach-file-btn")?.addEventListener("click", () => {
+        $("attach-menu")?.classList.add("hidden");
+        const inp = $("file-input");
+        inp.accept = "";
+        inp.click();
+    });
+    $("attach-gallery-btn")?.addEventListener("click", () => {
+        $("attach-menu")?.classList.add("hidden");
+        const inp = $("file-input");
+        inp.accept = "image/*,video/*";
+        inp.click();
+        inp.addEventListener("change", () => { inp.accept = ""; }, { once: true });
+    });
+    $("attach-camera-btn")?.addEventListener("click", () => {
+        $("attach-menu")?.classList.add("hidden");
+        $("camera-input").click();
+    });
     $("file-input")?.addEventListener("change", (e) => {
         const file = e.target.files[0]; if (!file) return;
         pendingFile = file; $("msg-input").placeholder = `Файл: ${file.name} (нажми Enter)`;
+        $("attach-menu")?.classList.add("hidden");
+    });
+    $("camera-input")?.addEventListener("change", (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        pendingFile = file; $("msg-input").placeholder = `Файл: ${file.name} (нажми Enter)`;
+        $("attach-menu")?.classList.add("hidden");
     });
 
     // --- Ответы ---
@@ -1203,6 +1294,51 @@ function bindEvents() {
     // --- Профиль (закрытие) ---
     $("profile-close")?.addEventListener("click", () => closeModal("profile-modal"));
 
+    // --- Контекстное меню сообщений ---
+    // КРИТИЧНО: раньше edit/pin/delete не работали. Теперь обрабатываем через ctxTargetMsgId.
+    document.querySelectorAll('#msg-context-menu .ctx-item').forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const action = btn.dataset.action;
+            $("msg-context-menu").classList.add("hidden");
+            const msgId = ctxTargetMsgId;
+            ctxTargetMsgId = null;
+            if (!msgId) return;
+            if (action === "reply") {
+                const msg = messagesCache.find(m => m.id === msgId);
+                if (!msg) return;
+                replyingTo = { id: msg.id, text: msg.text ? msg.text.substring(0, 40) : "", username: msg.sender_username };
+                $("reply-preview").style.display = "flex";
+                $("reply-text").textContent = msg.text ? (msg.text.substring(0, 40) + (msg.text.length > 40 ? "…" : "")) : "📎 Файл";
+                $("msg-input").placeholder = `Ответ ${msg.sender_username}...`;
+                $("msg-input").focus();
+            }
+            if (action === "edit") {
+                const msg = messagesCache.find(m => m.id === msgId);
+                if (!msg) return;
+                const newText = prompt("Новый текст:", msg.text || "");
+                if (newText === null || newText === msg.text) return;
+                try {
+                    const enc = await encryptText(newText);
+                    await apiRequest("/api/messages/edit", { method: "POST", body: JSON.stringify({ msg_id: msgId, content_encrypted: enc.ciphertext, iv: enc.iv }) });
+                    const el = document.querySelector(`[data-msg-id="${msgId}"] .msg-text`);
+                    if (el) el.textContent = newText;
+                    msg.text = newText;
+                } catch (e) { alert("Ошибка: " + (e.message || "unknown")); }
+            }
+            if (action === "delete") {
+                if (!confirm("Удалить сообщение?")) return;
+                try {
+                    await apiRequest("/api/messages/delete", { method: "POST", body: JSON.stringify({ msg_id: msgId }) });
+                } catch (e) { alert("Ошибка: " + (e.message || "unknown")); }
+            }
+            if (action === "pin") {
+                try {
+                    await apiRequest("/api/messages/pin", { method: "POST", body: JSON.stringify({ msg_id: msgId, pin: true }) });
+                } catch (e) { alert("Ошибка: " + (e.message || "unknown")); }
+            }
+        });
+    });
+
     // --- Контекстное меню чатов ---
     document.querySelectorAll('#chat-context-menu .ctx-item').forEach(btn => {
         btn.addEventListener("click", async () => {
@@ -1211,8 +1347,10 @@ function bindEvents() {
             if (!ctxTargetChatId) return;
             if (action === "delete_chat") {
                 if (!confirm("Удалить чат? Переписка сотрется навсегда.")) return;
-                await apiRequest("/api/chats/delete", { method: "POST", body: JSON.stringify({ chat_id: ctxTargetChatId }) });
-                location.reload();
+                try {
+                    await apiRequest("/api/chats/delete", { method: "POST", body: JSON.stringify({ chat_id: ctxTargetChatId }) });
+                    location.reload();
+                } catch (e) { alert("Ошибка: " + (e.message || "unknown")); }
             }
             if (action === "pin_chat") {
                 await apiRequest("/api/chats/pin", { method: "POST", body: JSON.stringify({ chat_id: ctxTargetChatId, pin: true }) });
@@ -1223,9 +1361,25 @@ function bindEvents() {
                 alert("Чат заблокирован");
                 loadChats();
             }
-            if (action === "report_chat") window.open("https://flash-msg.site/support.html", "_blank");
+            if (action === "report_chat") window.open("https://flash-msg.site/support.html", "_blank", "noopener");
             ctxTargetChatId = null;
         });
+    });
+
+    // --- Закрытие контекстных меню по клику вне ---
+    document.addEventListener("click", (e) => {
+        if (!e.target.closest("#msg-context-menu") && !e.target.closest(".msg-bubble")) {
+            $("msg-context-menu")?.classList.add("hidden");
+        }
+        if (!e.target.closest("#chat-context-menu") && !e.target.closest(".chat-item")) {
+            $("chat-context-menu")?.classList.add("hidden");
+        }
+        if (!e.target.closest("#attach-menu") && !e.target.closest("#attach-btn")) {
+            $("attach-menu")?.classList.add("hidden");
+        }
+        if (!e.target.closest("#stickers-popover") && !e.target.closest("#sticker-toggle-btn")) {
+            $("stickers-popover")?.classList.add("hidden");
+        }
     });
 
     // --- Очистка ---
@@ -1235,6 +1389,28 @@ function bindEvents() {
     };
     $("btn-reset-all")?.addEventListener("click", resetAll);
     $("btn-reset-all-desktop")?.addEventListener("click", resetAll);
+
+    // --- Кнопки применения кастомного цвета обоев ---
+    $("wallpaper-custom-apply")?.addEventListener("click", () => {
+        const val = $("wallpaper-custom-hex")?.value.trim();
+        if (!val || !/^#[0-9a-f]{6}$/i.test(val)) return alert("Введи HEX-цвет, например #1a1020");
+        personalization.wallpaper = "custom"; personalization.customWallpaper = val;
+        savePersonalization(); applyPersonalization(); renderPersonalizationPickers();
+    });
+    $("wallpaper-custom-apply-desktop")?.addEventListener("click", () => {
+        const val = $("wallpaper-custom-hex-desktop")?.value.trim();
+        if (!val || !/^#[0-9a-f]{6}$/i.test(val)) return alert("Введи HEX-цвет, например #1a1020");
+        personalization.wallpaper = "custom"; personalization.customWallpaper = val;
+        savePersonalization(); applyPersonalization(); renderPersonalizationPickers();
+    });
+    $("personalization-reset")?.addEventListener("click", () => {
+        personalization = { accent: "#ff2d6f", wallpaper: "default", customWallpaper: "" };
+        savePersonalization(); applyPersonalization(); renderPersonalizationPickers();
+    });
+    $("personalization-reset-desktop")?.addEventListener("click", () => {
+        personalization = { accent: "#ff2d6f", wallpaper: "default", customWallpaper: "" };
+        savePersonalization(); applyPersonalization(); renderPersonalizationPickers();
+    });
 }
 
 async function createNewChat() {

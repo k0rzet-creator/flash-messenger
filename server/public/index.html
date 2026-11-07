@@ -10,21 +10,54 @@
 <link rel="icon" href="/favicon.ico" sizes="any">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-  :root { --bg: #08080a; --bg-soft: #0f0f12; --bg-elev: #131318; --accent: #ff2d6f; --accent-soft: #ff2d6f33; --white: #fff; --gray: #8b8b96; --gray-dim: #4a4a55; --border: rgba(255,255,255,0.06); }
+  :root {
+    --bg: #08080a;
+    --bg-soft: #0f0f12;
+    --bg-elev: #131318;
+    --accent: #ff2d6f;
+    --accent-h: #ff4585;
+    --accent-soft: #ff2d6f33;
+    --white: #fff;
+    --gray: #8b8b96;
+    --gray-dim: #4a4a55;
+    --border: rgba(255,255,255,0.06);
+    --glass-bg: rgba(22, 22, 28, 0.75);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    --r-lg: 24px;
+    --r-pill: 999px;
+  }
   html { scroll-behavior: smooth; }
   body { background: var(--bg); color: var(--white); overflow-x: hidden; line-height: 1.5; position: relative; }
   .bg-layer { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
   .bg-layer::before { content: ''; position: absolute; top: -40%; left: 50%; transform: translateX(-50%); width: 120vw; height: 120vw; max-width: 1600px; max-height: 1600px; background: radial-gradient(circle, var(--accent-soft) 0%, transparent 55%); filter: blur(60px); opacity: 0.5; }
   .bg-layer::after { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px); background-size: 80px 80px; mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%); -webkit-mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%); }
-  
-  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(20px); background: rgba(8,8,10,0.6); border-bottom: 1px solid var(--border); }
-  .nav-logo { font-size: 20px; font-weight: 900; display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--white); }
-  .nav-logo-mark { width: 32px; height: 32px; background: var(--accent); border-radius: 10px; display: flex; align-items: center; justify-content: center; }
-  .nav-links { display: flex; gap: 36px; list-style: none; }
-  .nav-links a { color: var(--gray); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+
+  /* ПЛАВАЮЩИЙ ТОПБАР */
+  nav {
+    position: fixed;
+    top: 12px; left: 12px; right: 12px;
+    z-index: 100;
+    height: 60px;
+    padding: 0 20px;
+    background: var(--glass-bg) !important;
+    backdrop-filter: blur(40px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(40px) saturate(200%) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: var(--r-lg);
+    box-shadow: var(--glass-shadow);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .nav-logo { font-size: 18px; font-weight: 900; display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--white); flex-shrink: 0; }
+  .nav-logo-mark { width: 34px; height: 34px; background: var(--accent); border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px var(--accent-soft); }
+  .nav-links { display: flex; gap: 30px; list-style: none; }
+  .nav-links a { color: var(--gray); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; padding: 6px 0; }
   .nav-links a:hover { color: var(--white); }
-  .nav-cta { background: var(--white); color: var(--bg); padding: 10px 22px; border-radius: 100px; text-decoration: none; font-size: 14px; font-weight: 700; transition: all 0.25s; }
-  .nav-cta:hover { background: var(--accent); color: var(--white); }
+  .nav-cta { background: var(--accent); color: var(--white); padding: 10px 22px; border-radius: var(--r-pill); text-decoration: none; font-size: 14px; font-weight: 700; transition: all 0.25s; box-shadow: 0 4px 15px var(--accent-soft); white-space: nowrap; }
+  .nav-cta:hover { background: var(--accent-h); transform: translateY(-1px); }
 
   .hero { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-columns: 1.1fr 1fr; gap: 60px; align-items: center; max-width: 1240px; margin: 0 auto; padding: 140px 40px 100px; }
   .hero-content { display: flex; flex-direction: column; gap: 28px; }
@@ -36,29 +69,166 @@
   .hero-sub { font-size: clamp(16px, 1.5vw, 19px); color: var(--gray); max-width: 540px; line-height: 1.65; }
   .hero-sub strong { color: var(--white); font-weight: 600; }
   .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
-  
+
   .btn-primary { display: inline-flex; align-items: center; gap: 12px; background: var(--accent); color: var(--white); text-decoration: none; padding: 18px 36px; border-radius: 100px; font-size: 16px; font-weight: 700; transition: all 0.3s; box-shadow: 0 20px 40px -12px rgba(255,45,111,0.4); border: none; cursor: pointer; }
   .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 0 0 8px var(--accent-soft), 0 24px 50px -12px rgba(255,45,111,0.6); }
   .btn-ghost { display: inline-flex; align-items: center; gap: 10px; color: var(--white); text-decoration: none; padding: 18px 30px; border-radius: 100px; font-size: 16px; font-weight: 600; border: 1px solid var(--border); transition: all 0.25s; }
   .btn-ghost:hover { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.03); }
 
-  .hero-visual { display: flex; justify-content: center; align-items: center; position: relative; }
-  .phone { width: 320px; height: 640px; background: linear-gradient(145deg, #1c1c26, #0f0f16); border-radius: 46px; padding: 12px; box-shadow: 0 0 0 2px rgba(255,45,111,0.15), 0 30px 80px rgba(0,0,0,0.7); transform: rotate(-4deg); transition: transform 0.6s; }
-  .phone:hover { transform: rotate(0deg) scale(1.03); }
-  .phone-screen { width: 100%; height: 100%; background: linear-gradient(180deg, #0f0f16 0%, #15151f 100%); border-radius: 36px; overflow: hidden; display: flex; flex-direction: column; }
-  .chat-header { padding: 46px 20px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-  .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; position: relative; }
-  .avatar::after { content: ''; position: absolute; bottom: 0; right: 0; width: 11px; height: 11px; background: #22c55e; border-radius: 50%; border: 2px solid #0f0f16; }
-  .chat-name { font-size: 15px; font-weight: 700; }
-  .chat-status { font-size: 12px; color: var(--accent); display: flex; align-items: center; gap: 5px; }
-  .chat-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-  .chat-body { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
-  .msg { max-width: 78%; padding: 10px 14px; border-radius: 16px; font-size: 13.5px; line-height: 1.4; }
-  .msg-in { background: #1a1a20; border-bottom-left-radius: 4px; align-self: flex-start; }
-  .msg-out { background: var(--accent); border-bottom-right-radius: 4px; align-self: flex-end; font-weight: 600; box-shadow: 0 4px 15px rgba(255,45,111,0.3); }
-  .chat-input { padding: 14px 18px 24px; display: flex; gap: 10px; align-items: center; }
-  .chat-input-box { flex: 1; padding: 12px 16px; background: #1a1a20; border: 1px solid var(--border); border-radius: 100px; font-size: 13px; color: var(--gray-dim); }
-  .send-btn { width: 42px; height: 42px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  /* ============================================================
+     КРАСИВЫЙ 3D-ТЕЛЕФОН В HERO (как в download.html → Android)
+     ============================================================ */
+  .hero-visual {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 560px;
+    perspective: 1600px;
+  }
+  .visual-glow {
+    position: absolute;
+    width: 340px;
+    height: 340px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--accent-soft) 0%, transparent 70%);
+    filter: blur(50px);
+    z-index: 0;
+    pointer-events: none;
+    animation: pulseGlow 4s ease-in-out infinite;
+  }
+  @keyframes pulseGlow {
+    0%, 100% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.15); opacity: 0.9; }
+  }
+  .screen-3d {
+    position: relative;
+    z-index: 1;
+    border-radius: 20px;
+    overflow: hidden;
+    background: linear-gradient(145deg, #1a1a24, #0d0d13);
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow:
+      0 30px 80px -20px rgba(0,0,0,0.9),
+      0 0 0 1px rgba(255,45,111,0.1),
+      0 0 60px -10px var(--accent-soft);
+    transform-style: preserve-3d;
+    transition: transform 0.6s cubic-bezier(0.2, 0.9, 0.3, 1);
+  }
+  .screen-3d::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 40%);
+    pointer-events: none;
+    border-radius: inherit;
+  }
+  .phone-3d {
+    width: 260px;
+    height: 520px;
+    padding: 10px;
+    border-radius: 40px;
+    transform: rotateY(-10deg) rotateX(4deg) rotateZ(-2deg);
+    box-shadow:
+      0 40px 90px -20px rgba(0,0,0,0.95),
+      0 0 0 2px rgba(255,45,111,0.15),
+      0 0 80px -10px var(--accent-soft);
+  }
+  .phone-3d:hover {
+    transform: rotateY(-4deg) rotateX(2deg) rotateZ(0deg) scale(1.02);
+  }
+  .phone-3d-screen {
+    width: 100%; height: 100%;
+    background: linear-gradient(180deg, #0f0f16 0%, #15151f 100%);
+    border-radius: 32px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .phone-notch {
+    position: absolute;
+    top: 8px; left: 50%; transform: translateX(-50%);
+    width: 84px; height: 16px;
+    background: #000;
+    border-radius: var(--r-pill);
+    z-index: 5;
+  }
+  .phone-chat-head {
+    padding: 42px 16px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .phone-av {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    box-shadow: 0 4px 12px var(--accent-soft);
+  }
+  .phone-av::after {
+    content: '';
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 11px; height: 11px;
+    background: #22c55e;
+    border-radius: 50%;
+    border: 2px solid #0f0f16;
+  }
+  .phone-chat-name { font-size: 14px; font-weight: 700; }
+  .phone-chat-status { font-size: 11px; color: var(--accent); display: flex; align-items: center; gap: 4px; }
+  .phone-chat-status::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+  .phone-chat-body {
+    flex: 1;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .phone-msg {
+    max-width: 78%;
+    padding: 9px 13px;
+    border-radius: 15px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--white);
+  }
+  .phone-msg.in {
+    background: #1a1a20;
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+    color: var(--gray);
+  }
+  .phone-msg.out {
+    background: var(--accent);
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+    font-weight: 600;
+    box-shadow: 0 4px 14px var(--accent-soft);
+  }
+  .phone-input-bar {
+    padding: 10px 12px 22px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .phone-input-field {
+    flex: 1;
+    height: 32px;
+    background: #1a1a20;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: var(--r-pill);
+  }
+  .phone-send {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px var(--accent-soft);
+  }
 
   .marquee { position: relative; z-index: 1; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 22px 0; overflow: hidden; background: var(--bg-soft); }
   .marquee-track { display: flex; gap: 48px; white-space: nowrap; animation: scroll 40s linear infinite; width: max-content; }
@@ -122,14 +292,35 @@
   .footer-bottom .by { color: var(--accent); font-weight: 700; letter-spacing: 1px; font-family: 'Consolas', monospace; }
 
   @keyframes fadeUp { 0% { opacity: 0; transform: translateY(30px); } 100% { opacity: 1; transform: translateY(0); } }
-  @media (max-width: 1024px) { .hero { grid-template-columns: 1fr; text-align: center; } .hero-content { align-items: center; } .features { grid-template-columns: repeat(2, 1fr); } .security { grid-template-columns: 1fr; } .footer-grid { grid-template-columns: 1fr 1fr; } }
-  @media (max-width: 768px) { nav { padding: 16px 20px; } .nav-links { display: none; } .stats-bar { grid-template-columns: repeat(2, 1fr); } section { padding: 80px 20px; } .features { grid-template-columns: 1fr; } .download-actions { flex-direction: column; } .footer-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 1024px) {
+    .hero { grid-template-columns: 1fr; text-align: center; }
+    .hero-content { align-items: center; }
+    .hero-visual { min-height: 480px; order: -1; }
+    .features { grid-template-columns: repeat(2, 1fr); }
+    .security { grid-template-columns: 1fr; }
+    .footer-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 768px) {
+    nav { top: 8px; left: 8px; right: 8px; height: 56px; padding: 0 14px; }
+    .nav-links { display: none; }
+    .nav-logo { font-size: 16px; }
+    .nav-logo-mark { width: 30px; height: 30px; border-radius: 10px; }
+    .nav-cta { padding: 8px 16px; font-size: 13px; }
+    .hero-visual { min-height: 420px; }
+    .phone-3d { transform: none !important; width: 220px; height: 460px; }
+    .stats-bar { grid-template-columns: repeat(2, 1fr); }
+    section { padding: 80px 20px; }
+    .features { grid-template-columns: 1fr; }
+    .download-actions { flex-direction: column; }
+    .footer-grid { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
 
 <div class="bg-layer"></div>
 
+<!-- ПЛАВАЮЩИЙ ТОПБАР -->
 <nav>
   <a href="/" class="nav-logo">
     <div class="nav-logo-mark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="white" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
@@ -155,21 +346,30 @@
     </div>
   </div>
   <div class="hero-visual">
-    <div class="phone">
-      <div class="phone-screen">
-        <div class="chat-header">
-          <div class="avatar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="white"/></svg></div>
-          <div><div class="chat-name">Flash</div><div class="chat-status">AES-256-GCM</div></div>
+    <div class="visual-glow"></div>
+    <div class="screen-3d phone-3d">
+      <div class="phone-3d-screen">
+        <div class="phone-notch"></div>
+        <div class="phone-chat-head">
+          <div class="phone-av">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="white"/></svg>
+          </div>
+          <div>
+            <div class="phone-chat-name">Flash</div>
+            <div class="phone-chat-status">AES-256-GCM</div>
+          </div>
         </div>
-        <div class="chat-body">
-          <div class="msg msg-in">Уже поставил Flash?</div>
-          <div class="msg msg-out">Да, летает быстро</div>
-          <div class="msg msg-in">Ключи только у тебя?</div>
-          <div class="msg msg-out">Да, сервер видит только шифр</div>
+        <div class="phone-chat-body">
+          <div class="phone-msg in">Уже поставил Flash?</div>
+          <div class="phone-msg out">Да, летает быстро</div>
+          <div class="phone-msg in">Ключи только у тебя?</div>
+          <div class="phone-msg out">Да, сервер видит только шифр</div>
         </div>
-        <div class="chat-input">
-          <div class="chat-input-box">Сообщение...</div>
-          <div class="send-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></div>
+        <div class="phone-input-bar">
+          <div class="phone-input-field"></div>
+          <div class="phone-send">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+          </div>
         </div>
       </div>
     </div>
@@ -271,7 +471,7 @@
     </div>
   </div>
   <div class="footer-bottom">
-    <div>© 2026 Flash Messenger. MIT License.</div>
+    <div>© 2026 Flash Messenger. MPL 2.0 License.</div>
     <div>BY <span class="by">K0RZET</span></div>
   </div>
 </footer>
