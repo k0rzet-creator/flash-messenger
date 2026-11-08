@@ -6,6 +6,6 @@
     "password": "",
     "registration_open": true,
     "encryption_key": "сюда_впиши_32_символа_ключа_шифрования_!!!",
-    "jwt_secret": "b49413dd382bad2b8bf218b25ca27e56899005806e12fd15a09633ba72ae6dcd",
+    "jwt_secret": "b49413dd3bnfddbad2b8bf218b25ca27e56899005806e12fd15a09633ba72ae6dcd",
     "connect_secret": "da4891cb071e8fd5106530e74cace8687c66718436a9ca8d6f150a7e98178f84"
 }
