@@ -46,7 +46,6 @@ const PORT = CONFIG.port || 8080;
 const SERVER_PASSWORD = CONFIG.password || "";
 const REGISTRATION_OPEN = CONFIG.registration_open !== false;
 
-// Защита от дефолтных секретов-заглушек
 const BAD_SECRET_RE = /впиши|сюда|example|change.?me|placeholder/i;
 function ensureSecret(name, current) {
     if (current && current.length >= 32 && !BAD_SECRET_RE.test(current)) {
@@ -64,7 +63,6 @@ function ensureSecret(name, current) {
 }
 const JWT_SECRET = ensureSecret("jwt_secret", CONFIG.jwt_secret);
 const CONNECT_SECRET = ensureSecret("connect_secret", CONFIG.connect_secret);
-// encryption_key у сервера не нужен: шифрование на клиенте.
 
 const DATA_DIR = path.join(__dirname, "data");
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -86,7 +84,8 @@ db.exec(`
     );
     CREATE TABLE IF NOT EXISTS chats (
         id TEXT PRIMARY KEY, name TEXT, type TEXT DEFAULT 'direct',
-        created_by TEXT, created_at INTEGER NOT NULL
+        created_by TEXT, created_at INTEGER NOT NULL,
+        chat_key TEXT DEFAULT ''
     );
     CREATE TABLE IF NOT EXISTS chat_members (
         chat_id TEXT NOT NULL, user_id TEXT NOT NULL, joined_at INTEGER NOT NULL,
@@ -121,6 +120,10 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_files_hash ON files(hash);
 `);
 
+function generateChatKey() {
+    return crypto.randomBytes(32).toString("base64");
+}
+
 try {
     const userCols = db.prepare("PRAGMA table_info(users)").all();
     if (!userCols.some(c => c.name === "is_banned")) db.exec("ALTER TABLE users ADD COLUMN is_banned INTEGER DEFAULT 0");
@@ -129,6 +132,7 @@ try {
     if (!userCols.some(c => c.name === "avatar_url")) db.exec("ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT ''");
     const chatsInfo = db.prepare("PRAGMA table_info(chats)").all();
     if (!chatsInfo.some(c => c.name === "type")) db.exec("ALTER TABLE chats ADD COLUMN type TEXT DEFAULT 'direct'");
+    if (!chatsInfo.some(c => c.name === "chat_key")) db.exec("ALTER TABLE chats ADD COLUMN chat_key TEXT DEFAULT ''");
     const membersInfo = db.prepare("PRAGMA table_info(chat_members)").all();
     if (!membersInfo.some(c => c.name === "last_read_at")) db.exec("ALTER TABLE chat_members ADD COLUMN last_read_at INTEGER DEFAULT 0");
     if (!membersInfo.some(c => c.name === "is_pinned")) db.exec("ALTER TABLE chat_members ADD COLUMN is_pinned INTEGER DEFAULT 0");
@@ -141,6 +145,15 @@ try {
     if (!messagesInfo.some(c => c.name === "is_pinned")) db.exec("ALTER TABLE messages ADD COLUMN is_pinned INTEGER DEFAULT 0");
 } catch (e) { logWarn("Миграция не требуется"); }
 
+// Бэкфилл chat_key для старых чатов (старые сообщения всё равно не расшифруются)
+try {
+    const broken = db.prepare("SELECT id FROM chats WHERE chat_key IS NULL OR chat_key = ''").all();
+    for (const c of broken) {
+        db.prepare("UPDATE chats SET chat_key = ? WHERE id = ?").run(generateChatKey(), c.id);
+    }
+    if (broken.length) logInfo(`Сгенерированы chat_key для ${broken.length} старых чатов`);
+} catch (e) { logWarn("Бэкфилл chat_key: " + e.message); }
+
 // ============================================
 // MULTER
 // ============================================
@@ -151,7 +164,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
 // ============================================
-// RATE LIMITING (in-memory)
+// RATE LIMITING
 // ============================================
 const rateBuckets = new Map();
 function rateLimit(key, max, windowMs) {
@@ -196,8 +209,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// ВАЖНО: НЕ отдаём весь корень проекта (иначе утекут server.json, firebase-service-account.json, data/flash.db, package.json, server.js).
-// Только public/ и uploads/.
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(UPLOADS_DIR));
 
@@ -208,7 +219,6 @@ function uuid() { return crypto.randomUUID(); }
 function getUserById(id) { return db.prepare("SELECT id, username, display_name, avatar_url, bio, created_at, last_seen, is_banned, is_admin, badge FROM users WHERE id = ?").get(id); }
 function getUserByUsername(u) { return db.prepare("SELECT * FROM users WHERE username = ?").get(u.toLowerCase()); }
 
-// Утилита очистки строковых полей (trim + ограничение длины)
 function cleanString(s, maxLen = 200) {
     return String(s == null ? "" : s).trim().slice(0, maxLen);
 }
@@ -352,7 +362,7 @@ app.post("/api/chats/direct", auth, (req, res) => {
     if (existing) return res.json({ chat_id: existing.id });
     const chatId = uuid(); const now = Date.now();
     db.transaction(() => {
-        db.prepare("INSERT INTO chats (id, type, created_by, created_at) VALUES (?, 'direct', ?, ?)").run(chatId, req.userId, now);
+        db.prepare("INSERT INTO chats (id, type, created_by, created_at, chat_key) VALUES (?, 'direct', ?, ?, ?)").run(chatId, req.userId, now, generateChatKey());
         db.prepare("INSERT INTO chat_members (chat_id, user_id, joined_at, role) VALUES (?, ?, ?, 'member')").run(chatId, req.userId, now);
         db.prepare("INSERT INTO chat_members (chat_id, user_id, joined_at, role) VALUES (?, ?, ?, 'member')").run(chatId, otherUserId, now);
     })();
@@ -362,11 +372,10 @@ app.post("/api/chats/direct", auth, (req, res) => {
 app.post("/api/chats/group", auth, (req, res) => {
     const name = cleanString(req.body.name, 100);
     if (!name) return res.status(400).json({ error: "missing_name" });
-    // Разрешаем только group и channel (не direct — direct создаётся через /api/chats/direct)
     const type = req.body.type === "channel" ? "channel" : "group";
     const chatId = uuid(); const now = Date.now();
     db.transaction(() => {
-        db.prepare("INSERT INTO chats (id, name, type, created_by, created_at) VALUES (?, ?, ?, ?, ?)").run(chatId, name, type, req.userId, now);
+        db.prepare("INSERT INTO chats (id, name, type, created_by, created_at, chat_key) VALUES (?, ?, ?, ?, ?, ?)").run(chatId, name, type, req.userId, now, generateChatKey());
         db.prepare("INSERT INTO chat_members (chat_id, user_id, joined_at, role) VALUES (?, ?, ?, 'admin')").run(chatId, req.userId, now);
     })();
     logSuccess(`Создана группа "${name}"`);
@@ -397,7 +406,6 @@ app.post("/api/chats/read", auth, (req, res) => {
 
 app.post("/api/chats/delete", auth, (req, res) => {
     const chatId = cleanString(req.body.chat_id, 64);
-    // КРИТИЧНО: проверяем, что юзер — участник чата
     const member = db.prepare("SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?").get(chatId, req.userId);
     if (!member) return res.status(403).json({ error: "not_member" });
     db.transaction(() => {
@@ -422,11 +430,19 @@ app.post("/api/chats/block", auth, (req, res) => {
 });
 
 app.get("/api/chats/:chat_id/members", auth, (req, res) => {
-    // КРИТИЧНО: проверяем членство
     const member = db.prepare("SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?").get(req.params.chat_id, req.userId);
     if (!member) return res.status(403).json({ error: "not_member" });
     const members = db.prepare(`SELECT u.id, u.username, u.display_name, u.avatar_url, u.badge, u.last_seen, cm.role FROM chat_members cm JOIN users u ON u.id = cm.user_id WHERE cm.chat_id = ?`).all(req.params.chat_id);
     res.json(members);
+});
+
+// ВАЖНО: выдача ключа чата только участникам
+app.get("/api/chats/:chat_id/key", auth, (req, res) => {
+    const member = db.prepare("SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?").get(req.params.chat_id, req.userId);
+    if (!member) return res.status(403).json({ error: "not_member" });
+    const chat = db.prepare("SELECT chat_key FROM chats WHERE id = ?").get(req.params.chat_id);
+    if (!chat || !chat.chat_key) return res.status(404).json({ error: "no_key" });
+    res.json({ chat_key: chat.chat_key });
 });
 
 // ============================================
@@ -631,10 +647,8 @@ app.post("/api/push/register", auth, (req, res) => {
 
 async function sendPush(userId, title, body, chatId) {
     try {
-        // Не шлём пуши забаненным
         const user = db.prepare("SELECT is_banned FROM users WHERE id = ?").get(userId);
         if (!user || user.is_banned) return;
-
         const tokens = db.prepare("SELECT token FROM push_tokens WHERE user_id = ?").all(userId);
         if (tokens.length === 0) return;
         for (const t of tokens) {
@@ -694,7 +708,6 @@ app.post("/api/admin/badge", auth, adminAuth, (req, res) => {
 
 app.post("/api/admin/delete", auth, adminAuth, (req, res) => {
     const userId = cleanString(req.body.user_id, 64);
-    // Удаляем аватарку
     try {
         const u = getUserById(userId);
         if (u?.avatar_url) {
