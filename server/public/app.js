@@ -3,13 +3,12 @@
 // ============================================
 const STORAGE_KEY = "flash_state_v1";
 const PERSONALIZATION_KEY = "flash_personalization_v1";
-const CRYPTO_KEY_STORAGE = "flash_crypto_key_v1";
 const DEFAULT_SERVER_URL = "https://localhost:8080";
 
 let state = { servers: [], active_server_id: null };
 let currentServer = null, currentUser = null, currentAccount = null;
 let currentChat = null, currentChannel = null, chatsCache = [];
-let cryptoKey = null, connectToken = null;
+let connectToken = null;
 let onlineUsers = new Set(), readersCache = {}, replyingTo = null;
 let authMode = "login";
 let isMarkingAsRead = false;
@@ -44,7 +43,7 @@ const WALLPAPER_PRESETS = [
 const $ = (id) => document.getElementById(id);
 
 // ============================================
-// ОПРЕДЕЛЕНИЕ ORIGIN / LOCALSTORAGE
+// ORIGIN / LOCALSTORAGE
 // ============================================
 function getSelfOrigin() {
     try {
@@ -177,50 +176,53 @@ function renderPersonalizationPickers() {
 }
 
 // ============================================
-// ШИФРОВАНИЕ
-// ВАЖНО: ключ генерируется СЛУЧАЙНО и хранится в localStorage.
-// Это per-device: на другом устройстве — другой ключ, старые сообщения не прочитаются.
-// Для настоящего E2EE между устройствами нужен password-based KDF (TODO).
+// ШИФРОВАНИЕ — ОБЩИЙ КЛЮЧ ЧАТА
+// Сервер хранит chat_key и отдаёт его только участникам чата.
+// Это НЕ E2EE (сервер знает ключ), но работает между устройствами и людьми.
 // ============================================
-async function getOrCreateCryptoKey() {
-    let keyB64 = null;
-    try { keyB64 = localStorage.getItem(CRYPTO_KEY_STORAGE); } catch (e) {}
-    let keyBytes = null;
-    if (keyB64) {
-        try {
-            keyBytes = Uint8Array.from(atob(keyB64), c => c.charCodeAt(0));
-            if (!keyBytes || keyBytes.length !== 32) keyBytes = null;
-        } catch (e) { keyBytes = null; }
-    }
-    if (!keyBytes) {
-        keyBytes = crypto.getRandomValues(new Uint8Array(32));
-        try { localStorage.setItem(CRYPTO_KEY_STORAGE, btoa(String.fromCharCode(...keyBytes))); } catch (e) {}
-    }
-    return await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+const chatKeyCache = new Map(); // chat_id -> CryptoKey
+
+function clearChatKeyCache() { chatKeyCache.clear(); }
+
+async function importChatKey(base64Key) {
+    const raw = Uint8Array.from(atob(base64Key), c => c.charCodeAt(0));
+    if (raw.length !== 32) throw new Error("bad_chat_key_length");
+    return await crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 }
 
-async function initCrypto() {
-    try {
-        cryptoKey = await getOrCreateCryptoKey();
-    } catch (e) {
-        console.error("Crypto init failed:", e);
-    }
+async function getChatKey(chatId) {
+    if (chatKeyCache.has(chatId)) return chatKeyCache.get(chatId);
+    const data = await apiRequest(`/api/chats/${chatId}/key`);
+    if (!data.chat_key) throw new Error("no_chat_key");
+    const key = await importChatKey(data.chat_key);
+    chatKeyCache.set(chatId, key);
+    return key;
 }
-async function encryptText(text) {
-    if (!cryptoKey) throw new Error("crypto_not_ready");
+
+async function encryptTextFor(chatId, text) {
+    const key = await getChatKey(chatId);
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, cryptoKey, new TextEncoder().encode(text));
-    return { ciphertext: btoa(String.fromCharCode(...new Uint8Array(cipher))), iv: btoa(String.fromCharCode(...new Uint8Array(iv))) };
+    const cipher = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv }, key, new TextEncoder().encode(text)
+    );
+    return {
+        ciphertext: btoa(String.fromCharCode(...new Uint8Array(cipher))),
+        iv: btoa(String.fromCharCode(...new Uint8Array(iv)))
+    };
 }
-async function decryptText(ciphertextB64, ivB64) {
-    if (!cryptoKey) return "[нет ключа]";
+
+async function decryptTextFor(chatId, ciphertextB64, ivB64) {
     try {
+        const key = await getChatKey(chatId);
         const cipher = Uint8Array.from(atob(ciphertextB64), c => c.charCodeAt(0));
         const iv = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0));
-        const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, cryptoKey, cipher);
+        const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, cipher);
         return new TextDecoder().decode(plain);
-    } catch (e) { return "[не удалось расшифровать]"; }
+    } catch (e) {
+        return "[не удалось расшифровать]";
+    }
 }
+
 async function hashFile(file) {
     try {
         const arrayBuffer = await file.arrayBuffer();
@@ -230,7 +232,7 @@ async function hashFile(file) {
 }
 
 // ============================================
-// АВАТАРКА: ПРЕВЬЮ + ЗАГРУЗКА
+// АВАТАРКА
 // ============================================
 function readFileAsDataURL(file) {
     return new Promise((resolve, reject) => {
@@ -320,7 +322,7 @@ function startChatPolling() {
 function stopChatPolling() { if (chatPollInterval) { clearInterval(chatPollInterval); chatPollInterval = null; } }
 
 // ============================================
-// АВТОРИЗАЦИЯ UI
+// АВТОРИЗАЦИЯ
 // ============================================
 async function updateAuthServerInfo() {
     if (!currentServer) return;
@@ -401,7 +403,7 @@ async function doAuth() {
 }
 
 // ============================================
-// НАСТРОЙКИ ПРОФИЛЯ
+// ПРОФИЛЬ
 // ============================================
 async function saveProfile() {
     const username = $("settings-username").value.trim().toLowerCase();
@@ -457,11 +459,11 @@ function getAvatarHtml(user, sizeClass = "") {
 async function loadChats() {
     if (isLoadingChats) return;
     isLoadingChats = true;
-    const list = $("chat-list"); 
+    const list = $("chat-list");
     list.innerHTML = "";
     if (!currentUser) { isLoadingChats = false; return; }
     try {
-        const chats = await apiRequest("/api/chats"); 
+        const chats = await apiRequest("/api/chats");
         chatsCache = chats;
         for (const chat of chats) {
             const name = chat.other_user?.display_name || chat.other_user?.username || chat.name || "Чат";
@@ -487,7 +489,6 @@ async function loadChats() {
 }
 async function openChat(chat) {
     currentChat = chat;
-    // Сбрасываем pendingFile при смене чата
     pendingFile = null;
     const fileInput = $("file-input"); if (fileInput) fileInput.value = "";
     const cameraInput = $("camera-input"); if (cameraInput) cameraInput.value = "";
@@ -543,7 +544,7 @@ async function loadMessages() {
         messagesCache = [];
         const decrypted = [];
         for (const m of data.messages) {
-            const text = await decryptText(m.content_encrypted, m.iv);
+            const text = await decryptTextFor(currentChat.id, m.content_encrypted, m.iv);
             const norm = normalizeMessage(m, text, m.sender_username);
             messagesCache.push(norm); decrypted.push({ m, text });
         }
@@ -675,7 +676,7 @@ async function sendMessage() {
                 if (uploadData.error) throw new Error(uploadData.error);
                 fileId = uploadData.file_id;
             }
-            const enc = await encryptText("");
+            const enc = await encryptTextFor(currentChat.id, "");
             const msg = await apiRequest("/api/messages", { method: "POST", body: JSON.stringify({ chat_id: currentChat.id, content_encrypted: enc.ciphertext, iv: enc.iv, file_id: fileId, is_sticker: 0 }) });
             messagesCache.push(normalizeMessage(msg, "", currentUser.username));
             renderMessage("", true, msg.created_at, msg.id, null, currentUser.username, fileId, 0);
@@ -683,13 +684,11 @@ async function sendMessage() {
         } catch (e) {
             console.error(e);
             alert("Ошибка загрузки: " + (e.message || "unknown"));
-            // Вернуть файл и текст, чтобы можно было повторить
             pendingFile = fileToSend;
             input.value = savedText;
             input.placeholder = `Файл: ${fileToSend.name} (нажми Enter)`;
             return;
         }
-        // Если был текст — отправим его отдельным сообщением
         if (savedText) {
             input.value = savedText;
             await sendMessage();
@@ -702,7 +701,7 @@ async function sendMessage() {
     const currentReply = replyingTo; replyingTo = null;
     if ($("reply-preview")) $("reply-preview").style.display = "none";
     try {
-        const enc = await encryptText(text);
+        const enc = await encryptTextFor(currentChat.id, text);
         const body = { chat_id: currentChat.id, content_encrypted: enc.ciphertext, iv: enc.iv };
         if (currentReply) body.reply_to = currentReply.id;
         const msg = await apiRequest("/api/messages", { method: "POST", body: JSON.stringify(body) });
@@ -711,7 +710,7 @@ async function sendMessage() {
         scrollToBottom();
     } catch (e) {
         console.error(e);
-        input.value = text; // вернуть текст
+        input.value = text;
         alert("Ошибка отправки: " + (e.message || "unknown"));
     }
 }
@@ -859,7 +858,7 @@ function uploadStickerToPack(packId, onSuccess) {
 async function sendSticker(fileId) {
     if (!currentChat) return;
     try {
-        const enc = await encryptText("");
+        const enc = await encryptTextFor(currentChat.id, "");
         const msg = await apiRequest("/api/messages", { method: "POST", body: JSON.stringify({ chat_id: currentChat.id, content_encrypted: enc.ciphertext, iv: enc.iv, file_id: fileId, is_sticker: 1 }) });
         messagesCache.push(normalizeMessage(msg, "", currentUser.username));
         renderMessage("", true, msg.created_at, msg.id, null, currentUser.username, fileId, 1);
@@ -879,7 +878,7 @@ function subscribeWebSocket() {
         currentChannel.onmessage = async (e) => {
             const data = JSON.parse(e.data);
             if (data.type === "message" && data.message.chat_id === currentChat?.id && data.message.sender_id !== currentUser.id) {
-                const decrypted = await decryptText(data.message.content_encrypted, data.message.iv);
+                const decrypted = await decryptTextFor(currentChat.id, data.message.content_encrypted, data.message.iv);
                 const senderName = currentChat.other_user?.username || "User";
                 messagesCache.push(normalizeMessage(data.message, decrypted, senderName));
                 renderMessage(decrypted, false, data.message.created_at, data.message.id, data.message.reply_to, senderName, data.message.file_id, data.message.is_sticker || 0);
@@ -894,7 +893,7 @@ function subscribeWebSocket() {
             }
             if (data.type === "message_deleted") { messagesCache = messagesCache.filter(m => m.id !== data.msg_id); const el = document.querySelector(`[data-msg-id="${data.msg_id}"]`); if (el) el.remove(); }
             if (data.type === "message_edited") {
-                const newText = await decryptText(data.content_encrypted, data.iv);
+                const newText = await decryptTextFor(currentChat.id, data.content_encrypted, data.iv);
                 const el = document.querySelector(`[data-msg-id="${data.msg_id}"] .msg-text`);
                 if (el) el.textContent = newText;
                 const cached = messagesCache.find(x => x.id === data.msg_id); if (cached) cached.text = newText;
@@ -1069,7 +1068,6 @@ function closeMobileSettings() {
 // СОБЫТИЯ
 // ============================================
 function bindEvents() {
-    // --- Авторизация ---
     $("tab-login")?.addEventListener("click", () => setAuthMode("login"));
     $("tab-register")?.addEventListener("click", () => setAuthMode("register"));
     $("auth-submit")?.addEventListener("click", doAuth);
@@ -1085,7 +1083,6 @@ function bindEvents() {
         } catch (err) { console.error(err); }
     });
 
-    // --- Основное ---
     $("send-btn")?.addEventListener("click", sendMessage);
     $("msg-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
     $("new-chat-btn")?.addEventListener("click", () => {
@@ -1113,11 +1110,11 @@ function bindEvents() {
     $("logout-btn")?.addEventListener("click", () => {
         if (!confirm("Выйти из аккаунта?")) return;
         currentChat = null;
+        clearChatKeyCache();
         currentAccount = null; currentUser = null; if (currentServer) currentServer.account = null;
         saveState(); if (currentChannel) { try { currentChannel.close(); } catch(e){} currentChannel = null; } stopChatPolling(); showAuth();
     });
 
-    // --- Настройки ---
     $("settings-btn")?.addEventListener("click", () => {
         if (window.innerWidth <= 768) $("nav-settings")?.click();
         else { switchSettingsSection("profile"); openModal("settings-modal"); }
@@ -1180,7 +1177,6 @@ function bindEvents() {
         }
     });
 
-    // --- Мобильная навигация ---
     $("nav-chats")?.addEventListener("click", () => {
         $("nav-chats").classList.add("active"); $("nav-settings").classList.remove("active");
         closeMobileSettings(); $("app-screen").classList.remove("chat-open"); document.body.classList.remove("chat-open");
@@ -1210,6 +1206,7 @@ function bindEvents() {
     $("mobile-btn-logout")?.addEventListener("click", () => {
         if (!confirm("Выйти из аккаунта?")) return;
         currentChat = null;
+        clearChatKeyCache();
         currentAccount = null; currentUser = null; if (currentServer) currentServer.account = null;
         saveState(); if (currentChannel) { try { currentChannel.close(); } catch(e){} currentChannel = null; } stopChatPolling(); showAuth();
     });
@@ -1223,7 +1220,6 @@ function bindEvents() {
         }).catch(e => alert("Ошибка: " + e.message));
     });
 
-    // --- Сервера ---
     $("server-btn-auth")?.addEventListener("click", () => {
         if (window.innerWidth <= 768) $("nav-settings")?.click();
         else { switchSettingsSection("servers"); openModal("settings-modal"); }
@@ -1243,7 +1239,6 @@ function bindEvents() {
         saveState(); closeModal("add-server-modal"); renderServersList();
     });
 
-    // --- Стикеры ---
     $("sticker-toggle-btn")?.addEventListener("click", toggleStickers);
     $("stickers-close-btn")?.addEventListener("click", () => $("stickers-popover").classList.add("hidden"));
     $("btn-create-pack")?.addEventListener("click", async () => {
@@ -1253,7 +1248,6 @@ function bindEvents() {
         loadStickerPacks();
     });
 
-    // --- Вложения: attach-menu ---
     $("attach-btn")?.addEventListener("click", (e) => {
         e.stopPropagation();
         $("attach-menu")?.classList.toggle("hidden");
@@ -1286,16 +1280,12 @@ function bindEvents() {
         $("attach-menu")?.classList.add("hidden");
     });
 
-    // --- Ответы ---
     $("cancel-reply")?.addEventListener("click", () => {
         replyingTo = null; $("reply-preview").style.display = "none"; $("msg-input").placeholder = "Пиши что-нибудь...";
     });
 
-    // --- Профиль (закрытие) ---
     $("profile-close")?.addEventListener("click", () => closeModal("profile-modal"));
 
-    // --- Контекстное меню сообщений ---
-    // КРИТИЧНО: раньше edit/pin/delete не работали. Теперь обрабатываем через ctxTargetMsgId.
     document.querySelectorAll('#msg-context-menu .ctx-item').forEach(btn => {
         btn.addEventListener("click", async () => {
             const action = btn.dataset.action;
@@ -1318,7 +1308,7 @@ function bindEvents() {
                 const newText = prompt("Новый текст:", msg.text || "");
                 if (newText === null || newText === msg.text) return;
                 try {
-                    const enc = await encryptText(newText);
+                    const enc = await encryptTextFor(currentChat.id, newText);
                     await apiRequest("/api/messages/edit", { method: "POST", body: JSON.stringify({ msg_id: msgId, content_encrypted: enc.ciphertext, iv: enc.iv }) });
                     const el = document.querySelector(`[data-msg-id="${msgId}"] .msg-text`);
                     if (el) el.textContent = newText;
@@ -1339,7 +1329,6 @@ function bindEvents() {
         });
     });
 
-    // --- Контекстное меню чатов ---
     document.querySelectorAll('#chat-context-menu .ctx-item').forEach(btn => {
         btn.addEventListener("click", async () => {
             const action = btn.dataset.action;
@@ -1366,7 +1355,6 @@ function bindEvents() {
         });
     });
 
-    // --- Закрытие контекстных меню по клику вне ---
     document.addEventListener("click", (e) => {
         if (!e.target.closest("#msg-context-menu") && !e.target.closest(".msg-bubble")) {
             $("msg-context-menu")?.classList.add("hidden");
@@ -1382,7 +1370,6 @@ function bindEvents() {
         }
     });
 
-    // --- Очистка ---
     const resetAll = () => {
         if (!confirm("Сбросить всё?")) return;
         localStorage.clear(); location.reload();
@@ -1390,7 +1377,6 @@ function bindEvents() {
     $("btn-reset-all")?.addEventListener("click", resetAll);
     $("btn-reset-all-desktop")?.addEventListener("click", resetAll);
 
-    // --- Кнопки применения кастомного цвета обоев ---
     $("wallpaper-custom-apply")?.addEventListener("click", () => {
         const val = $("wallpaper-custom-hex")?.value.trim();
         if (!val || !/^#[0-9a-f]{6}$/i.test(val)) return alert("Введи HEX-цвет, например #1a1020");
@@ -1431,10 +1417,7 @@ async function createNewChat() {
 // ============================================
 async function boot() {
     loadPersonalization();
-    loadState(); 
-    
-    try { await initCrypto(); } catch(e) { console.warn("Crypto error:", e); }
-    
+    loadState();
     bindEvents();
 
     currentServer = getActiveServer();
